@@ -1,0 +1,13 @@
+# Modify the value for each entry as you wish
+# Please make sure for the path you specify, you have the right permission
+# NOTE: DO NOT CHANGE THE KEYS !
+
+[Qconfig]
+# The path you wish to store the downloaded videos, r+w
+VIDEO_PATH = ./qvod
+# The cache path used when downloading, r+w
+CACHE_PATH = ./qvod/qvodcache
+# If nothing is downloaded during this time period (seconds) after start, it's TIMEOUT
+TIMEOUT = 300
+# All the Qvod URLs will be stored into this directory by their filenames for further reuse
+RECORD = ./qvod/qvod_urls
