@@ -135,6 +135,7 @@ def download_proc(qvod_url, frename = ""):
     while True:
         print "detect whether download succe"
         print cache_dir + os.sep +complete
+        print cache
         if os.path.isfile(donotescapespace(cache_dir + os.sep + complete)):
             print "aaaaa"
             p_downloder.terminate()
@@ -150,11 +151,13 @@ def download_proc(qvod_url, frename = ""):
                     print "Cannot move the cache file to video path"
             b_successed = True
             break
-        elif  os.path.isfile(donotescapespace(cache_dir + os.sep + cache)):
+        elif  not os.path.isfile(donotescapespace(cache_dir + os.sep + cache)):
+            
             cur_time = time.time()
             passed_time = cur_time - start_time
             if cur_time - last_update >= timeout:
                 p_downloder.terminate()
+                print "time out kill downloader"
                 b_successed = False
                 break
         time.sleep(5)
