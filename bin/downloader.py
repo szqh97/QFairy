@@ -25,7 +25,7 @@ elif re.match("WIN.*", sys.platform, re.IGNORECASE):
     __platform__ = "WIN"
 
 
-def load_qfairy_config():
+def load_config():
     config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
     config = ConfigParser()
     config_dict = {}
@@ -33,7 +33,8 @@ def load_qfairy_config():
     config_dict["VIDEO_PATH"] = config.get("Qconfig", "VIDEO_PATH") # TODO set a default path
     config_dict["CACHE_PATH"] = config.get("Qconfig", "CACHE_PATH") # TODO set a default path
     config_dict["TIMEOUT"] = config.get("Qconfig", "TIMEOUT") # TODO set a default path
-    config_dict["RECORD "] = config.get("Qconfig", "RECORD") # FIXME use database instead it
+    config_dict["CONCUR_NUM"] = config.get("Qconfig", "CONCUR_NUM") # FIXME use database instead it
+    config_dict["QVODTASK_DB"] = config.get("Qconfig", "QVODTASK_DB")
     return config_dict
 
 def verify_url(qvod_url):
@@ -71,7 +72,7 @@ def download_proc(qvod_url, frename = ""):
     env_check()
 
     # load conf
-    conf = load_qfairy_config()
+    conf = load_config()
     print conf
     video_path = conf["VIDEO_PATH"] 
     print video_path
@@ -137,15 +138,14 @@ def download_proc(qvod_url, frename = ""):
         print cache_dir + os.sep +complete
         print cache
         if os.path.isfile(donotescapespace(cache_dir + os.sep + complete)):
-            print "aaaaa"
             p_downloder.terminate()
             if __platform__ == "LINUX":
-                if os.system("mv " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + frename + '.' + suffix):
+                if not os.system("mv " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
                     os.system("rm -rf " + cache_dir)
                 else:
                     print "Cannot move the cache file to video path"
             elif __platform__ == "WIN":
-                if os.system("move " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + frename + '.' + suffix):
+                if not os.system("move " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
                     os.system("rmdir /s " + cache_dir)
                 else:
                     print "Cannot move the cache file to video path"
