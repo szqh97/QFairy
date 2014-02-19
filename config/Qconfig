@@ -1,7 +1,6 @@
 # Modify the value for each entry as you wish
 # Please make sure for the path you specify, you have the right permission
 # NOTE: DO NOT CHANGE THE KEYS !
-
 [Qconfig]
 # The path you wish to store the downloaded videos, r+w
 VIDEO_PATH = ./qvod
@@ -11,3 +10,9 @@ CACHE_PATH = ./qvod/qvodcache
 TIMEOUT = 300
 # All the Qvod URLs will be stored into this directory by their filenames for further reuse
 RECORD = ./qvod/qvod_urls
+# qvod task db
+QVODTASK_DB = ./qvod_task.db
+# concurrent number of qvod downloader
+CONCUR_NUM = 5
+# download url prex , DOWN_PREX + filename is the download url
+DOWN_PREX = http://192.168.40.169/qvod_download/
