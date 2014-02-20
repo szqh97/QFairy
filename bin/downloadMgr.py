@@ -92,6 +92,7 @@ def qvod_download_proc(instance):
 
     while True:
         task = instance.taskQ.get()
+        logger.info("task: %s", str(task))
         taskid = task.idx
         qvod_url = task.qvod_url
         hash_code = task.hash_code
@@ -107,6 +108,8 @@ def qvod_download_proc(instance):
             logger.error("update task status error!")
             logger.error("%s", str(traceback.format_exc()))
 
+        if qvod_url.__class__ is unicode:
+            qvod_url = qvod_url.encode("utf-8")
         trunks = downloader.verify_url(str(qvod_url))
         logger.debug("trunks is: %s", str(trunks))
         movie = ""
@@ -116,8 +119,8 @@ def qvod_download_proc(instance):
         suffix = '.'.join(('', movie.split('.')[-1]))
         filename = hash_code + suffix
         time.sleep(10)
-
         ret = downloader.download_proc(qvod_url, filename)
+
         time.sleep(5)
 
         download_url = down_prex + filename
