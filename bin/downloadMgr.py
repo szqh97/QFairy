@@ -21,7 +21,7 @@ __HOME__ = os.path.dirname(__filedir__)
 
 def install_logger():
     global logger
-    logger.config.fileConfig("./config/logging.conf")
+    logger.config.fileConfig(os.path.normpath(os.path.join(__HOME__, "config", "logging.conf")))
     logger = logger.getLogger("QvodDownloader")
 
 class downloaderMgr(threading.Thread):
