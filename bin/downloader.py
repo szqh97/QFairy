@@ -21,7 +21,8 @@ __INSTALLER__ = os.path.normpath(os.path.join(__HOME__, "bin", __INSTALLER__))
 logger = logging
 def install_logger():
     global logger
-    logger.config.fileConfig("./config/logging.conf")
+    
+    logger.config.fileConfig(os.path.normpath(os.path.join(__HOME__, "config", "logging.conf")))
     logger = logger.getLogger("QvodDownloader")
 install_logger()
 
