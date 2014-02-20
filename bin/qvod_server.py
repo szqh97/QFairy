@@ -30,7 +30,7 @@ def load_config():
 
 urls = (
         "qvod_submit_task", "task_submit",
-        
+        "qvod_query_task", "task_query",
     )
 
 class task_submit:
@@ -83,4 +83,10 @@ class task_submit:
         return simplejson.dumps(resp)
 
 
-class 
+class task_query:
+    def __init__(self):
+        pass
+
+    def GET(self):
+
+        pass
