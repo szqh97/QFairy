@@ -1,3 +1,4 @@
 qvod/
 *.log
 *.pyc
+*.swp
