@@ -63,9 +63,10 @@ def env_check():
 
 def download_proc(qvod_url, frename = ""):
     # verify qvod url
-    trunks = verify_url(qvod_url)
+    trunks = verify_url(str(qvod_url))
     if not trunks:
         print str(thread.get_ident()) + " QVOD url is illegal"
+        return False
     movie_len, hash_code, movie = trunks
     movie = movie.replace(' ', "\ ").replace('(', "\(").replace(')', "\)")
 
@@ -107,7 +108,7 @@ def download_proc(qvod_url, frename = ""):
             return False
 
     # copy setup.exe to hashcode+movie_hasicode.exe
-    download_exe = hash_code + '+' + frename + '_' + hash_code + ".exe"
+    download_exe =  frename + '_' + hash_code + ".exe"
     cmd = ""
     p_downloder = None
     if __platform__ == "LINUX":
@@ -128,7 +129,7 @@ def download_proc(qvod_url, frename = ""):
             print "xxx"
     
     # update downloading progress
-    cache = hash_code + '+' + frename+ ".!qd"
+    cache =  frename+ ".!qd"
     complete = cache.replace(".!qd", '')
     b_successed = False
     start_time = time.time()

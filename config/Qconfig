@@ -11,7 +11,7 @@ TIMEOUT = 300
 # All the Qvod URLs will be stored into this directory by their filenames for further reuse
 RECORD = ./qvod/qvod_urls
 # qvod task db
-QVODTASK_DB = ./qvod_task.db
+QVODTASK_DB = ./config/qvod_tasks.db
 # concurrent number of qvod downloader
 CONCUR_NUM = 5
 # download url prex , DOWN_PREX + filename is the download url
