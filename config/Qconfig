@@ -16,3 +16,10 @@ QVODTASK_DB = ./config/qvod_tasks.db
 CONCUR_NUM = 5
 # download url prex , DOWN_PREX + filename is the download url
 DOWN_PREX = http://192.168.40.169/qvod_download/
+
+db_host = localhost
+db_user = root
+db_pass = 123
+db_name = test
+
+

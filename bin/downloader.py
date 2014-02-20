@@ -8,7 +8,8 @@ import re
 import sys
 import time
 import thread
-import sqlite3
+import logging
+import logging.config
 import subprocess
 from ConfigParser import ConfigParser
 
@@ -16,7 +17,14 @@ __filedir__ = os.path.dirname(os.path.abspath(__file__))
 __HOME__ = os.path.dirname(__filedir__)
 __INSTALLER__ = "QvodSetup.exe"
 __INSTALLER__ = os.path.normpath(os.path.join(__HOME__, "bin", __INSTALLER__))
-print __HOME__
+
+logger = logging
+def install_logger():
+    global logger
+    logger.config.fileConfig("./config/logging.conf")
+    logger = logger.getLogger("QvodDownloader")
+install_logger()
+
 
 if re.match("LINUX.*", sys.platform, re.IGNORECASE):
     __platform__ = "LINUX"
@@ -34,7 +42,11 @@ def load_config():
     config_dict["CACHE_PATH"] = config.get("Qconfig", "CACHE_PATH") # TODO set a default path
     config_dict["TIMEOUT"] = config.get("Qconfig", "TIMEOUT") # TODO set a default path
     config_dict["CONCUR_NUM"] = config.get("Qconfig", "CONCUR_NUM") # FIXME use database instead it
-    config_dict["QVODTASK_DB"] = config.get("Qconfig", "QVODTASK_DB")
+    config_dict["DOWN_PREX"] = config.get("Qconfig", "DOWN_PREX")
+    config_dict["db_host"] = config.get("Qconfig", "db_host")
+    config_dict["db_name"] = config.get("Qconfig", "db_name")
+    config_dict["db_user"] = config.get("Qconfig", "db_user")
+    config_dict["db_pass"] = config.get("Qconfig", "db_pass")
     return config_dict
 
 def verify_url(qvod_url):
@@ -57,7 +69,7 @@ def env_check():
     if __platform__ == "LINUX":
         ret = os.system("which wine 2>&1 >/dev/null")
         if ret != 0:
-            print "error, Please install Wine first ..."
+            logger.error("Error, there is no wine found, Please install first")
             return False
 
 
@@ -65,7 +77,7 @@ def download_proc(qvod_url, frename = ""):
     # verify qvod url
     trunks = verify_url(str(qvod_url))
     if not trunks:
-        print str(thread.get_ident()) + " QVOD url is illegal"
+        logger.error("qvod url: %s, illegal", str(qvod_url))
         return False
     movie_len, hash_code, movie = trunks
     movie = movie.replace(' ', "\ ").replace('(', "\(").replace(')', "\)")
@@ -74,9 +86,7 @@ def download_proc(qvod_url, frename = ""):
 
     # load conf
     conf = load_config()
-    print conf
     video_path = conf["VIDEO_PATH"] 
-    print video_path
     cache_path = conf["CACHE_PATH"]
     timeout = int(conf["TIMEOUT"])
 
@@ -88,23 +98,19 @@ def download_proc(qvod_url, frename = ""):
     else:
         frename = frename.replace(' ', "\ ").replace('(', "\(").replace(')', "\)")
     movie = frename.replace(suffix, '')
-    print movie, frename
     
     frename = frename.decode("utf-8")
     cache_dir = os.path.normpath(os.path.join(cache_path, movie))
 
     if not os.path.isdir(donotescapespace(cache_dir)):
         cmd = ""
-        print __platform__
         if __platform__ == "LINUX":
             cmd = 'mkdir -p ' + cache_dir + " 1>&2 >/dev/null"
-            print cmd
         elif __platform__ == "WIN":
             cmd = 'mkdir ' + cache_dir
-            print cmd
         ret = os.system(cmd)
         if ret != 0: 
-            print str(thread.get_ident()) + " Permission denied to create cache directory!"
+            logger.error("error! Permission denied to create cache directory!")
             return False
 
     # copy setup.exe to hashcode+movie_hasicode.exe
@@ -113,12 +119,11 @@ def download_proc(qvod_url, frename = ""):
     p_downloder = None
     if __platform__ == "LINUX":
         cmd = "cp " + __INSTALLER__ + ' ' + cache_dir + os.sep + download_exe
-        print cmd
         if not os.system(cmd):
             p_downloder = subprocess.Popen(["wine", donotescapespace(cache_dir + os.sep + download_exe)],
                     stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         else:
-            print "cp xxxx"
+            logger.error("generate download exe error!")
 
     elif __platform__ == "WIN":
         cmd = "copy " + __INSTALLER__ + ' ' + cache_dir + os.sep + download_exe
@@ -126,7 +131,7 @@ def download_proc(qvod_url, frename = ""):
             p_downloder = subprocess.Popen([donotescapespace(cache_dir + os.sep + download_exe)], 
                     stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         else:
-            print "xxx"
+            logger.error("generate download exe error!")
     
     # update downloading progress
     cache =  frename+ ".!qd"
@@ -135,21 +140,18 @@ def download_proc(qvod_url, frename = ""):
     start_time = time.time()
     last_update = start_time
     while True:
-        print "detect whether download succe"
-        print cache_dir + os.sep +complete
-        print cache
         if os.path.isfile(donotescapespace(cache_dir + os.sep + complete)):
             p_downloder.terminate()
             if __platform__ == "LINUX":
                 if not os.system("mv " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
                     os.system("rm -rf " + cache_dir)
                 else:
-                    print "Cannot move the cache file to video path"
+                    logger.error("Cannot move the cache file to video path")
             elif __platform__ == "WIN":
                 if not os.system("move " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
                     os.system("rmdir /s " + cache_dir)
                 else:
-                    print "Cannot move the cache file to video path"
+                    logger.error("Cannot move the cache file to video path")
             b_successed = True
             break
         elif  not os.path.isfile(donotescapespace(cache_dir + os.sep + cache)):
@@ -158,15 +160,16 @@ def download_proc(qvod_url, frename = ""):
             passed_time = cur_time - start_time
             if cur_time - last_update >= timeout:
                 p_downloder.terminate()
-                print "time out kill downloader"
+                logger.info("time out kill downloader")
                 b_successed = False
                 break
         time.sleep(5)
     if b_successed:
-        print "Completed!"
+        logger.info("file %s download completed!", complete)
         return True
     return False
 
+# for test only
 if __name__ == '__main__':
     download_proc(sys.argv[1], sys.argv[2])
 

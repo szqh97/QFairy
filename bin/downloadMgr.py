@@ -6,14 +6,23 @@ import os
 import sys
 import time
 import Queue
-import sqlite3
+import torndb
+import logging
+import logging.config
 import traceback
 import threading
 import downloader
 import multiprocessing
 
+logger = logging
+
 __filedir__ = os.path.dirname(os.path.abspath(__file__))
 __HOME__ = os.path.dirname(__filedir__)
+
+def install_logger():
+    global logger
+    logger.config.fileConfig("./config/logging.conf")
+    logger = logger.getLogger("QvodDownloader")
 
 class downloaderMgr(threading.Thread):
     """
@@ -26,23 +35,25 @@ class downloaderMgr(threading.Thread):
         self.taskQ = Queue.Queue()
         self.down_processes =[]
 
-    def get_tasks(self, taskdb):
+    def get_tasks(self):
         tasks_list = lambda:None
-        taskdb = os.path.normpath(os.path.join(__HOME__, taskdb))
-        print taskdb
+        logger.debug("%s", self.config)
         try:
-            conn = sqlite3.connect(taskdb, timeout = 100)
-            cursor = conn.cursor()
-            sql = "select id, qvod_url, hash_code, filename, status from qvod_task where status = 0 and id > %d order by id" % self.cur_task_id
-            cursor.execute(sql)
-            tasks_list = cursor.fetchall()
+            dbhost = self.config["db_host"]
+            dbname = self.config["db_name"]
+            dbuser = self.config["db_user"]
+            dbpass = self.config["db_pass"]
+            conn = torndb.Connection(dbhost, dbname, dbuser, dbpass)
+            sql = "select id as idx, qvod_url, hash_code, filename, status from qvod_tasks where status = 'initialized' and id > %d order by id" % self.cur_task_id
+            logger.debug("get task sql is: %s", sql)
+            tasks_list = conn.query(sql)
             conn.close()
         except Exception, err:
-            print "get qvod downlaod tasks error"
-            print traceback.format_exc()
+            logger.error("get task error!")
+            logger.error("%s", str(traceback.format_exc()))
 
         if len(tasks_list) > 0:
-            self.cur_task_id = tasks_list[-1][0]
+            self.cur_task_id = tasks_list[-1].idx
             for t in tasks_list:
                 self.taskQ.put(t)
 
@@ -60,7 +71,7 @@ class downloaderMgr(threading.Thread):
             qvod_db = ""
             if self.config.has_key("QVODTASK_DB"):
                 qvod_db = self.config["QVODTASK_DB"]
-            self.get_tasks(qvod_db)
+            self.get_tasks()
             time.sleep(20)
 
 def qvod_download_proc(instance):
@@ -69,63 +80,67 @@ def qvod_download_proc(instance):
     start downloader.download_proc,
     update db
     """
-    print "start qvod_download_proc ..."
-    qvod_db = ""
+    logger.info("start qvod download...")
     down_prex = ""
-    if  instance.config.has_key("QVODTASK_DB"):
-        qvod_db = instance.config["QVODTASK_DB"]
     if instance.config.has_key("DOWN_PREX"):
         down_prex = instance.config["DOWN_PREX"]
 
+    dbhost = instance.config["db_host"]
+    dbname = instance.config["db_name"]
+    dbuser = instance.config["db_user"]
+    dbpass = instance.config["db_pass"]
+
     while True:
         task = instance.taskQ.get()
-        taskid, qvod_url, hash_code, filename, status = task
+        taskid = task.idx
+        qvod_url = task.qvod_url
+        hash_code = task.hash_code
+        filename = task.filename
+        status = task.status
         try:
-            conn = sqlite3.connect(qvod_db, timeout = 100)
-            cursor = conn.cursor()
-            sql = "update qvod_task set updated_at = current_timestamp, status = 1 where id = %d" % taskid
-            cursor.execute(sql)
-            conn.commit()
+            conn = torndb.Connection(dbhost, dbname, dbuser, dbpass)
+            sql = "update qvod_tasks set updated_at = current_timestamp, status = 'processing' where id = %d" % taskid
+            logger.debug("update status to processing, sql: %s", sql)
+            conn.execute(sql)
             conn.close()
-            print "update status to 1"
         except Exception, err:
-            print traceback.format_exc()
+            logger.error("update task status error!")
+            logger.error("%s", str(traceback.format_exc()))
 
-        #sssss"
-        print qvod_url
         trunks = downloader.verify_url(str(qvod_url))
+        logger.debug("trunks is: %s", str(trunks))
         movie = ""
         if trunks:
             movie_len, hash_code, movie = trunks
         movie = movie.replace(' ', "\ ").replace('(', "\(").replace(')', "\)")
-        print "movie is", movie
         suffix = '.'.join(('', movie.split('.')[-1]))
         filename = hash_code + suffix
-        print "aaaa"
-        print qvod_url, filename
         time.sleep(10)
 
         ret = downloader.download_proc(qvod_url, filename)
+        time.sleep(5)
 
         download_url = down_prex + filename
+        logger.info("%s, %s", down_prex, filename)
         try:
-            conn = sqlite3.connect(qvod_db, timeout = 100)
-            cursor = conn.cursor()
+            conn = torndb.Connection(dbhost, dbname, dbuser, dbpass)
             sql = ""
             if ret:
-                sql = "update qvod_task set updated_at = current_timestamp, status = 2, download_url = %s, filename = %s  where id = %d" % \
+                sql = "update qvod_tasks set updated_at = current_timestamp, status = 'succeed', download_url = '%s', filename = '%s'  where id = %d" % \
                         (download_url, movie, taskid)
             else:
-                sql = "update qvod_task set updated_at = current_timestamp, status = 3 where id = %d" % taskid
-            print "sql is ", sql
-            cursor.execute(sql)
-            conn.commit()
+                sql = "update qvod_tasks set updated_at = current_timestamp, status = 'error' where id = %d" % taskid
+            logger.debug("update task status after download, sql: %s", sql)
+            conn.execute(sql)
             conn.close()
-            print "update status 2"
         except Exception, err:
-            print traceback.format_exc()
+            logger.error("update task status after downloading error!")
+            logger.error("%s", str(traceback.format_exc()))
 
 if __name__ == '__main__':
+    install_logger()
+    logger.info("download Manager starting ...")
     Mgr = downloaderMgr()
+    Mgr.setDaemon(False)
     Mgr.start()
 
