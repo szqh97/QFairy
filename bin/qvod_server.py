@@ -34,6 +34,14 @@ status_dict = { "succeed": 0,
         "input error": 100
         }
 
+def check_platform():
+    platform = ""
+    if re.match("LINUX.*", sys.platform, re.IGNORECASE):
+        platform = "LINUX"
+    elif re.match("WIN.*", sys.platform, re.IGNORECASE):
+        platform = "WIN"
+    return platform
+
 def load_config():
     config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
     config = ConfigParser()
@@ -162,28 +170,49 @@ class deletefile:
     def POST(self):
         config = self.config
         video_path = config["VIDEO_PATH"]
+        print "zzzz"
         raw_data = web.data()
+        print raw_data
+        print 'aaa'
         req = simplejson.loads(raw_data)
         try:
             hash_list = req["hashid_list"]
+            sql = ""
+            if len(hash_list) == 1:
+                sql = "select qvod_url, hash_code from qvod_tasks where hash_code = '%s' " % hash_list[0]
+            else:
+                sql = "select qvod_url, hash_code from qvod_tasks where hash_code in %s" % str(tuple(hash_list))
+            print sql
             conn = db_conn()
-            sql = "select qvod_url, hash_code from qvod_tasks where hash_code in %s" % str(tuple(hash_list))
             res = conn.query(sql)
             conn.close()
+            print res
             for item in res:
-                qvod_url = res.qvod_url
-                hash_code = res.hash_code
+                qvod_url = item.qvod_url
+                hash_code = item.hash_code
                 suffix = '.' + qvod_url.split('|')[2].split('.')[-1]
                 filename = hash_code + suffix 
-                filename = os.path.normpath(os.path.join(video_path, filename))
-                #FIXME os platform
-                if os.path.exist(filename):
-                    os.system("rm -f %s" % filename)
-            ErrorCode = 0
-            ErrorMessage = "success"
+                filename = os.path.normpath(os.path.join(__HOME__, video_path, filename))
+                print filename
+                print os.getcwd()
+
+                cmd = ""
+                platform = check_platform()
+                if platform == "LINUX":
+                    cmd = "rm -f %s" % filename
+                elif paltform == "WIN":
+                    cmd = "del /q %s " % filename
+                print os.path.exists(filename)
+                if os.path.exists(filename) and not os.system(cmd):
+                    ErrorCode = 0
+                    ErrorMessage = "success"
+                else:
+                    ErrorCode = -1
+                    ErrorMessage = "server error: delete file error"
         except Exception, err:
             ErrorCode = -1
             ErrorMessage = "server error"
+            web.debug("Error: %s", str(traceback.format_exc()))
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
         return simplejson.dumps(resp)
 

@@ -33,6 +33,14 @@ elif re.match("WIN.*", sys.platform, re.IGNORECASE):
     MKDIRP = "mkdir "
     __platform__ = "WIN"
 
+def check_platform():
+    platform = ""
+    if re.match("LINUX.*", sys.platform, re.IGNORECASE):
+        platform = "LINUX"
+    elif re.match("WIN.*", sys.platform, re.IGNORECASE):
+        platform = "WIN"
+    return platform
+
 
 def load_config():
     config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
