@@ -1,5 +1,5 @@
 qvod/
 *.log
 *.pyc
-*.swp
-*.*.swo
+.*.swp
+.*.swo
