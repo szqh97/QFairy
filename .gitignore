@@ -2,4 +2,4 @@ qvod/
 *.log
 *.pyc
 *.swp
-*.swo
+*.*.swo
