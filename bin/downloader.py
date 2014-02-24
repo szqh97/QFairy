@@ -97,6 +97,8 @@ def download_proc(qvod_url, frename = ""):
     conf = load_config()
     video_path = conf["VIDEO_PATH"] 
     cache_path = conf["CACHE_PATH"]
+    video_path = os.path.normpath(os.path.join(__HOME__, video_path))
+    cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
     timeout = int(conf["TIMEOUT"])
 
     # cache dir

@@ -37,7 +37,6 @@ class downloaderMgr(threading.Thread):
 
     def get_tasks(self):
         tasks_list = lambda:None
-        logger.debug("%s", self.config)
         try:
             dbhost = self.config["db_host"]
             dbname = self.config["db_name"]
