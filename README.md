@@ -3,12 +3,26 @@ QFairy
 
 download qvod movie 
 
+dependences
+=========
+python, mysql, MySQLdb, simplejson, web.py, setuptools
+
+
+configure
+=======
+配置文件为config/Qconfig, 根据实际情况进行配置，
+DOWN_PREX的端口号要与QFairy_start.bat中　SimpleHTTPServer的端口号一致
+
 install
 =======
 1. 下载https://pypi.python.org/packages/source/s/setuptools/setuptools-2.2.tar.gz 解压后，执行 python setup.py install 安装setuptools
 2. 执行 easy_install.py web.py 安装 web.py
+3. 执行　easy_install.py simplejson 安装simplejson
+4. 执行　easy_install.py MySQLdb 安装 MySQLdb
 
-在Windows下安装时会报
+Question
+========
+1. 如果在Windows下安装时报
 
 Traceback (most recent call last):
   File "C:\Python27\lib\runpy.py", line 162, in _run_module_as_main
