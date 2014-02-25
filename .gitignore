@@ -3,3 +3,5 @@ qvod/
 *.pyc
 .*.swp
 .*.swo
+*.bk
+*.bak
