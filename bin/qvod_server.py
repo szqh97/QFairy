@@ -120,15 +120,21 @@ class task_submit:
 
 class task_query:
     def __init__(self):
+        self.config = load_config()
         pass
 
     def GET(self):
+        config = self.config
         params = web.input()
         ErrorCode = 2
         ErrorMessage = "initialized"
         DownloadURL = ""
         qvod_url = ""
         hash_code = ""
+        video_path = config["VIDEO_PATH"]
+        cache_path = config["CACHE_PATH"]
+        video_path = os.path.normpath(os.path.join(__HOME__, video_path))
+        cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
         if params.has_key("qvod_url"):
             qvod_url = params["qvod_url"]
             hash_code = qvod_url.split('|')[1]
@@ -165,60 +171,29 @@ class deletefile:
         self.config = load_config()
 
     def POST(self):
+        ErroCode = 0
+        cmd = "success"
         config = self.config
         video_path = config["VIDEO_PATH"]
         cache_path = config["CACHE_PATH"]
-        cache_path = os.path.normapth(os.path.join(__HOME__, cache_path))
+        video_path = os.path.normpath(os.path.join(__HOME__, video_path))
+        cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
         raw_data = web.data()
         req = simplejson.loads(raw_data)
         hash_list = req["hashid_list"]
-        files = os.listdir(cache_path)
+        files = os.listdir(video_path)
         for hash_code in hash_list:
-            exist_files = [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE)]
-
-
+            exist_files = [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE) and os.isfile(f)]
+        exist_files = [ os.path.normpath(os.path.join(video_path,f)) for f in exist_files ]
+        files2del = ' '.join(exist_files)
         
-
-
-
-        try:
-            hash_list = req["hashid_list"]
-            sql = ""
-            if len(hash_list) == 1:
-                sql = "select qvod_url, hash_code from qvod_tasks where hash_code = '%s' " % hash_list[0]
-            else:
-                sql = "select qvod_url, hash_code from qvod_tasks where hash_code in %s" % str(tuple(hash_list))
-            print sql
-            conn = db_conn()
-            res = conn.query(sql)
-            conn.close()
-            print res
-            for item in res:
-                qvod_url = item.qvod_url
-                hash_code = item.hash_code
-                suffix = '.' + qvod_url.split('|')[2].split('.')[-1]
-                filename = hash_code + suffix 
-                filename = os.path.normpath(os.path.join(__HOME__, video_path, filename))
-                print filename
-                print os.getcwd()
-
-                cmd = ""
-                platform = check_platform()
-                if platform == "LINUX":
-                    cmd = "rm -f %s" % filename
-                elif paltform == "WIN":
-                    cmd = "del /q %s " % filename
-                print os.path.exists(filename)
-                if os.path.exists(filename) and not os.system(cmd):
-                    ErrorCode = 0
-                    ErrorMessage = "success"
-                else:
-                    ErrorCode = -1
-                    ErrorMessage = "server error: delete file error"
-        except Exception, err:
+        if os.name == 'posix':
+            cmd = "rm -f %s" % files2del
+        elif os.name = 'nt':
+            cmd = "del /q %s" % files2del
+        if not os.system(cmd):
             ErrorCode = -1
-            ErrorMessage = "server error"
-            web.debug("Error: %s", str(traceback.format_exc()))
+            ErrorMessage = "server error: delete files error"
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
         return simplejson.dumps(resp)
 
