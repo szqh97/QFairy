@@ -8,6 +8,7 @@ import re
 import os
 import sys
 import traceback
+import collections
 import simplejson
 from ConfigParser import ConfigParser
 
@@ -17,6 +18,8 @@ __filedir__ = os.path.dirname(os.path.abspath(__file__))
 __HOME__ = os.path.dirname(__filedir__)
 
 import torndb
+import portalocker
+from portalocker import lock, unlock, LOCK_EX
 
 urls = (
         "/qvod_submit_task", "task_submit",
@@ -48,10 +51,8 @@ def load_config():
     config_dict = {}
     config.read(config_file)
     config_dict["VIDEO_PATH"] = config.get("Qconfig", "VIDEO_PATH")
-    config_dict["db_host"] = config.get("Qconfig", "db_host")
-    config_dict["db_name"] = config.get("Qconfig", "db_name")
-    config_dict["db_user"] = config.get("Qconfig", "db_user")
-    config_dict["db_pass"] = config.get("Qconfig", "db_pass")
+    config_dict["CACHE_PATH"] = config.get("Qconfig", "CACHE_PATH")
+    config_dict["QVODTASK_FILE"] = config.get("Qconfig", "QVODTASK_FILE")
     return config_dict
 
 
@@ -85,31 +86,34 @@ class task_submit:
 
     def POST(self):
         config = self.config
+        task_file = confi['QVODTASK_FILE']
+        task_file = os.path.normpath(os.path.join(__HOME__, task_file))
         raw_data = web.data()
         post_data = simplejson.loads(raw_data)
         qvod_urls = post_data.get("qvod_urls")
 
         ErrorCode = 0
         ErrorMessage = "success"
-        try:
-            conn = db_conn()
-            #FIXME convert unicode to utf8?
-            for url in qvod_urls:
-                if url.__class__ is unicode:
-                    url = url.encode('utf-8')
-                if self.valid_url(url):
-                    hash_code = url.split('|')[1]
-                    sql = "insert into qvod_tasks (qvod_url, hash_code, created_at, updated_at) values ( '%s', '%s', \
-                            current_timestamp, current_timestamp)" % (url, hash_code)
-                    conn.execute(sql)
-                else:
-                    ErrorCode = 100
-                    ErrorMessage = "input errror"
-            conn.close()
-        except Exception, err:
-            ErrorCode = -1
-            ErrorMessage = "server error"
-            print traceback.format_exc()
+
+        with file(task_file, "r+") as f:
+            lock(f, LOCK_EX)
+            try:
+                taskQ = cPickle.load(f)
+                for url in qvod_urls:
+                    if not self.valid_url(url):
+                        ErrorCode = 100
+                        ErrorMessage = "input error"
+                    taskQ.append(url)
+                s = cPickle.dumps(taskQ)
+                f.seek(0,0)
+                f.truncate()
+                f.write(s)
+            except Exception, err:
+                ErrorCod = -1
+                ErrorMessage = "server error"
+                print traceback.format_exc()
+            unlock(f)
+        
         resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
         return simplejson.dumps(resp)
 
@@ -163,11 +167,20 @@ class deletefile:
     def POST(self):
         config = self.config
         video_path = config["VIDEO_PATH"]
-        print "zzzz"
+        cache_path = config["CACHE_PATH"]
+        cache_path = os.path.normapth(os.path.join(__HOME__, cache_path))
         raw_data = web.data()
-        print raw_data
-        print 'aaa'
         req = simplejson.loads(raw_data)
+        hash_list = req["hashid_list"]
+        files = os.listdir(cache_path)
+        for hash_code in hash_list:
+            exist_files = [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE)]
+
+
+        
+
+
+
         try:
             hash_list = req["hashid_list"]
             sql = ""
