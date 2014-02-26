@@ -85,16 +85,9 @@ class task_submit:
 
     def POST(self):
         config = self.config
-        print "aaaa"
         raw_data = web.data()
-        print "bbbb"
-        print raw_data
-        print type(raw_data)
-        print raw_data.__class__
         post_data = simplejson.loads(raw_data)
-        print "ccccc"
         qvod_urls = post_data.get("qvod_urls")
-        print qvod_urls[0].__class__
 
         ErrorCode = 0
         ErrorMessage = "success"

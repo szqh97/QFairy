@@ -56,6 +56,7 @@ def load_config():
     config_dict["db_name"] = config.get("Qconfig", "db_name")
     config_dict["db_user"] = config.get("Qconfig", "db_user")
     config_dict["db_pass"] = config.get("Qconfig", "db_pass")
+    config_dict["QVODTASK_FILE"] = config.get("Qconfig", "QVODTASK_FILE")
     return config_dict
 
 def verify_url(qvod_url):

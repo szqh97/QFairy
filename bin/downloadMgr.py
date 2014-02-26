@@ -7,8 +7,11 @@ import sys
 import time
 import Queue
 import torndb
+import cPickle
 import logging
 import logging.config
+import portalocker
+from portalocker import lock, unlock, LOCK_EX
 import traceback
 import threading
 import downloader
@@ -35,109 +38,115 @@ class downloaderMgr(threading.Thread):
         self.taskQ = Queue.Queue()
         self.down_processes =[]
 
-    def get_tasks(self):
-        tasks_list = lambda:None
-        try:
-            dbhost = self.config["db_host"]
-            dbname = self.config["db_name"]
-            dbuser = self.config["db_user"]
-            dbpass = self.config["db_pass"]
-            conn = torndb.Connection(dbhost, dbname, dbuser, dbpass)
-            sql = "select id as idx, qvod_url, hash_code, filename, status from qvod_tasks where status = 'initialized' and id > %d order by id" % self.cur_task_id
-            logger.debug("get task sql is: %s", sql)
-            tasks_list = conn.query(sql)
-            conn.close()
-        except Exception, err:
-            logger.error("get task error!")
-            logger.error("%s", str(traceback.format_exc()))
+    def start_download(self):
+        concur_num = len(self.config["CONCUR_NUM"])
+        task_pickle = self.config["QVODTASK_FILE"]
+        task_pickle = os.path.normpath(os.path.join(__HOME__, task_pickle))
 
-        if len(tasks_list) > 0:
-            self.cur_task_id = tasks_list[-1].idx
-            for t in tasks_list:
-                self.taskQ.put(t)
+        # start download threads at first time
+        if len(self.down_processes) == 0:
+            tasks = []
+            taskQ = None
+            with file(task_pickle, "r+") as f:
+                lock(f, LOCK_EX)
+                try:
+                    taskQ = cPickle.load(f)
+                    if len(taskQ):
+                        logger.info("taskQ: %s" % str(taskQ))
+                except EOFError, e:
+                    logger.info ("there is no task to download.")
+
+                for i in xrange(concur_num):
+                    qvod_url = ""
+                    try:
+                        qvod_url = taskQ.popleft()
+                    except IndexError, e :
+                        break
+                    tasks.append(qvod_url)
+
+                s = cPickle.dumps(taskQ)
+                f.seek(0,0)
+                f.truncate()
+                f.write(s)
+                unlock(f)
+
+            print tasks
+            for t in tasks:
+                self.down_processes.append(threading.Thread(target = qvod_download_proc, args = (self.config, t)))
+            for t in self.down_processes:
+                t.setDaemon(True)
+                t.start()
+            time.sleep(5)
+            return 
+        
+        need_start = 0
+        for t in self.down_processes:
+            if not t.is_alive():
+                self.down_processes.remove(t)
+                ++need_start
+        
+        if need_start:
+            qvod_urls = []
+            with file (task_pickle, "r+") as f:
+                lock(f, LOCK_EX)
+                taskQ = cPickle.load(f)
+                for i in xrange(need_start):
+                    qvod_url = taskQ.popleft()
+                    qvod_urls.append(qvod_url)
+                s = cPickle.dumps(taskQ)
+                f.seek(0,0)
+                f.truncate()
+                f.write(s)
+                unlock(f)
+            for qvod_url in qvod_urls:
+                t = threading.Thread(target = qvod_download_proc, args = (self.config, qvod_url))
+                self.down_processes.append(t)
+                t.setDaemon(True)
+                t.start()
+        
+        time.sleep(5)
 
     def run(self):
-        tasknum = 0
-        if self.config.has_key("CONCUR_NUM"):
-            tasknum = int(self.config["CONCUR_NUM"])
-        for i in xrange(tasknum):
-            self.down_processes.append(threading.Thread(target = qvod_download_proc, args = (self,)))
-        for t in self.down_processes:
-            t.setDaemon(True)
-            t.start()
-
         while True:
-            qvod_db = ""
-            if self.config.has_key("QVODTASK_DB"):
-                qvod_db = self.config["QVODTASK_DB"]
-            self.get_tasks()
-            time.sleep(20)
-
-def qvod_download_proc(instance):
+            self.start_download()
+            
+def qvod_download_proc(config, qvod_url):
     """
     get task from downloaderMgr, 
     start downloader.download_proc,
     update db
     """
-    logger.info("start qvod download...")
-    down_prex = ""
-    if instance.config.has_key("DOWN_PREX"):
-        down_prex = instance.config["DOWN_PREX"]
+    cache_path = config["CACHE_PATH"]
+    down_prex = config["DOWN_PREX"]
 
-    dbhost = instance.config["db_host"]
-    dbname = instance.config["db_name"]
-    dbuser = instance.config["db_user"]
-    dbpass = instance.config["db_pass"]
+    if qvod_url.__class__ is unicode:
+        qvod_url = qvod_url.encode("utf-8")
+        
+    trunks = downloader.verify_url(qvod_url)
 
-    while True:
-        task = instance.taskQ.get()
-        logger.info("task: %s", str(task))
-        taskid = task.idx
-        qvod_url = task.qvod_url
-        hash_code = task.hash_code
-        filename = task.filename
-        status = task.status
-        try:
-            conn = torndb.Connection(dbhost, dbname, dbuser, dbpass)
-            sql = "update qvod_tasks set updated_at = current_timestamp, status = 'processing' where id = %d" % taskid
-            logger.debug("update status to processing, sql: %s", sql)
-            conn.execute(sql)
-            conn.close()
-        except Exception, err:
-            logger.error("update task status error!")
-            logger.error("%s", str(traceback.format_exc()))
+    movie = ""
+    if trunks:
+        movie_len, hash_code, movie = trunks
+    else:
+        logger.error("ivalid qvod url:%s", qvod_url)
+        return 
 
-        if qvod_url.__class__ is unicode:
-            qvod_url = qvod_url.encode("utf-8")
-        trunks = downloader.verify_url(str(qvod_url))
-        logger.debug("trunks is: %s", str(trunks))
-        movie = ""
-        if trunks:
-            movie_len, hash_code, movie = trunks
-        movie = movie.replace(' ', "\ ").replace('(', "\(").replace(')', "\)")
-        suffix = '.'.join(('', movie.split('.')[-1]))
-        filename = hash_code + suffix
-        time.sleep(10)
-        ret = downloader.download_proc(qvod_url, filename)
-
-        time.sleep(5)
-
-        download_url = down_prex + filename
-        logger.info("%s, %s", down_prex, filename)
-        try:
-            conn = torndb.Connection(dbhost, dbname, dbuser, dbpass)
-            sql = ""
-            if ret:
-                sql = "update qvod_tasks set updated_at = current_timestamp, status = 'succeed', download_url = '%s', filename = '%s'  where id = %d" % \
-                        (download_url, movie, taskid)
-            else:
-                sql = "update qvod_tasks set updated_at = current_timestamp, status = 'error' where id = %d" % taskid
-            logger.debug("update task status after download, sql: %s", sql)
-            conn.execute(sql)
-            conn.close()
-        except Exception, err:
-            logger.error("update task status after downloading error!")
-            logger.error("%s", str(traceback.format_exc()))
+    movie = movie.replace(' ', "\ ").replace('(', "\(").replace(')', "\)")
+    suffix = '.'.join(('', movie.split('.')[-1]))
+    filename = hash_code + suffix
+    ret = downloader.download_proc(qvod_url, filename)
+    
+    # download error move 4AD312D81D59DDBC7684139892E1A41C51C4C094/ to4AD312D81D59DDBC7684139892E1A41C51C4C094.err/ in cache dir
+    if not ret:
+        old_cache = os.path.normpath(os.path.join(cache_path, hash_code))
+        err_cache = os.path.normpath(os.path.join(cache_path, hash_code + ".err"))
+        cmd = ""
+        if os.name == 'posix':
+            cmd = "mv %s %s" % (old_cache, err_cache)
+        elif os.name == 'nt':
+            cmd = "rename %s %s" % (old_cache, err_cache)
+        if os.system(cmd):
+            logger.error("rename %s -> %s failed", old_cache, err_cache)
 
 if __name__ == '__main__':
     install_logger()
