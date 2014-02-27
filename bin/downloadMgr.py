@@ -68,7 +68,6 @@ class downloaderMgr(threading.Thread):
                     f.truncate()
                     f.write(s)
 
-            print tasks
             for t in tasks:
                 self.down_processes.append(threading.Thread(target = qvod_download_proc, args = (self.config, t)))
             for t in self.down_processes:
