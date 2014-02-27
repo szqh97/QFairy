@@ -146,15 +146,14 @@ def download_proc(qvod_url, frename = ""):
                     logger.error("Cannot move the cache file to video path")
             b_successed = True
             break
-        elif  not os.path.isfile(donotescapespace(cache_dir + os.sep + cache)):
             
-            cur_time = time.time()
-            passed_time = cur_time - start_time
-            if cur_time - last_update >= timeout:
-                p_downloder.terminate()
-                logger.info("time out kill downloader")
-                b_successed = False
-                break
+        cur_time = time.time()
+        passed_time = cur_time - start_time
+        if cur_time - last_update >= timeout:
+            p_downloder.terminate()
+            logger.info("time out kill downloader")
+            b_successed = False
+            break
         time.sleep(5)
     if b_successed:
         logger.info("file %s download completed!", complete)
