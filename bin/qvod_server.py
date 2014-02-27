@@ -19,8 +19,6 @@ from ConfigParser import ConfigParser
 __filedir__ = os.path.dirname(os.path.abspath(__file__))
 __HOME__ = os.path.dirname(__filedir__)
 
-import torndb
-
 urls = (
         "/qvod_submit_task", "task_submit",
         "/qvod_query_task", "task_query",
@@ -56,21 +54,6 @@ def load_config():
     config_dict["DOWN_PREX"] = config.get("Qconfig", "DOWN_PREX")
     return config_dict
 
-
-def db_conn():
-    conn = None
-    try:
-        config =load_config()
-        dbhoat = config
-        dbhost = config["db_host"]
-        dbname = config["db_name"]
-        dbuser = config["db_user"]
-        dbpass = config["db_pass"]
-        conn = torndb.Connection(dbhost, dbname, dbuser, dbpass)
-    except Exception, err:
-        web.debug(" load db config error: %s", str(traceback.format_exc()))
-    return conn
-
 class task_submit:
     def __init__(self):
         self.config = load_config()
@@ -92,7 +75,6 @@ class task_submit:
         raw_data = web.data()
         post_data = simplejson.loads(raw_data)
         qvod_urls = post_data.get("qvod_urls")
-        print "xxxxxxxxxxxxxxxx"
 
         ErrorCode = 0
         ErrorMessage = "success"
