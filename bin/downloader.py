@@ -26,22 +26,6 @@ def install_logger():
     logger = logger.getLogger("QvodDownloader")
 install_logger()
 
-
-if re.match("LINUX.*", sys.platform, re.IGNORECASE):
-    __platform__ = "LINUX"
-elif re.match("WIN.*", sys.platform, re.IGNORECASE):
-    MKDIRP = "mkdir "
-    __platform__ = "WIN"
-
-def check_platform():
-    platform = ""
-    if re.match("LINUX.*", sys.platform, re.IGNORECASE):
-        platform = "LINUX"
-    elif re.match("WIN.*", sys.platform, re.IGNORECASE):
-        platform = "WIN"
-    return platform
-
-
 def load_config():
     config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
     config = ConfigParser()
@@ -52,10 +36,6 @@ def load_config():
     config_dict["TIMEOUT"] = config.get("Qconfig", "TIMEOUT") # TODO set a default path
     config_dict["CONCUR_NUM"] = config.get("Qconfig", "CONCUR_NUM") # FIXME use database instead it
     config_dict["DOWN_PREX"] = config.get("Qconfig", "DOWN_PREX")
-    config_dict["db_host"] = config.get("Qconfig", "db_host")
-    config_dict["db_name"] = config.get("Qconfig", "db_name")
-    config_dict["db_user"] = config.get("Qconfig", "db_user")
-    config_dict["db_pass"] = config.get("Qconfig", "db_pass")
     config_dict["QVODTASK_FILE"] = config.get("Qconfig", "QVODTASK_FILE")
     return config_dict
 
@@ -76,7 +56,7 @@ def donotescapespace(s):
     return s.replace("\ ", ' ')
 
 def env_check():
-    if __platform__ == "LINUX":
+    if os.name == 'posix':
         ret = os.system("which wine 2>&1 >/dev/null")
         if ret != 0:
             logger.error("Error, there is no wine found, Please install first")
@@ -116,9 +96,9 @@ def download_proc(qvod_url, frename = ""):
 
     if not os.path.isdir(donotescapespace(cache_dir)):
         cmd = ""
-        if __platform__ == "LINUX":
+        if os.name == 'posix':
             cmd = 'mkdir -p ' + cache_dir + " 1>&2 >/dev/null"
-        elif __platform__ == "WIN":
+        elif os.name == 'nt':
             cmd = 'mkdir ' + cache_dir
         ret = os.system(cmd)
         if ret != 0: 
@@ -129,7 +109,7 @@ def download_proc(qvod_url, frename = ""):
     download_exe =  frename + '_' + hash_code + ".exe"
     cmd = ""
     p_downloder = None
-    if __platform__ == "LINUX":
+    if os.name == 'posix':
         cmd = "cp " + __INSTALLER__ + ' ' + cache_dir + os.sep + download_exe
         if not os.system(cmd):
             p_downloder = subprocess.Popen(["wine", donotescapespace(cache_dir + os.sep + download_exe)],
@@ -137,7 +117,7 @@ def download_proc(qvod_url, frename = ""):
         else:
             logger.error("generate download exe error!")
 
-    elif __platform__ == "WIN":
+    elif os.name == 'nt':
         cmd = "copy " + __INSTALLER__ + ' ' + cache_dir + os.sep + download_exe
         if not os.system(cmd):
             p_downloder = subprocess.Popen([donotescapespace(cache_dir + os.sep + download_exe)], 
@@ -154,12 +134,12 @@ def download_proc(qvod_url, frename = ""):
     while True:
         if os.path.isfile(donotescapespace(cache_dir + os.sep + complete)):
             p_downloder.terminate()
-            if __platform__ == "LINUX":
+            if os.name == 'posix':
                 if not os.system("mv " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
                     os.system("rm -rf " + cache_dir)
                 else:
                     logger.error("Cannot move the cache file to video path")
-            elif __platform__ == "WIN":
+            elif os.name == 'nt':
                 if not os.system("move /y " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
                     os.system("rmdir /s " + cache_dir)
                 else:
