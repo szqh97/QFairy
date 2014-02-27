@@ -81,7 +81,9 @@ class task_submit:
                         if not self.valid_url(url):
                             ErrorCode = 100
                             ErrorMessage = "input error"
-                        taskQ.append(url)
+                        h = url.split('|')[2]
+                        if len ([ t for t in taskQ if re.match('.*' + h + ',*', t, re.IGNORECASE) ]) == 0:
+                            taskQ.append(url)
                     s = cPickle.dumps(taskQ)
                     f.seek(0,0)
                     f.truncate()
