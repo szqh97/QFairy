@@ -38,7 +38,7 @@ class downloaderMgr(threading.Thread):
         self.down_processes =[]
 
     def start_download(self):
-        concur_num = len(self.config["CONCUR_NUM"])
+        concur_num = int(self.config["CONCUR_NUM"])
         task_pickle = self.config["QVODTASK_FILE"]
         task_pickle = os.path.normpath(os.path.join(__HOME__, task_pickle))
 
