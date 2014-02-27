@@ -11,6 +11,7 @@ import cPickle
 import traceback
 import collections
 import simplejson
+from filelock import FileLock
 from ConfigParser import ConfigParser
 
 #FIXME add path environment varibles if run it as moudule of apache
@@ -19,8 +20,6 @@ __filedir__ = os.path.dirname(os.path.abspath(__file__))
 __HOME__ = os.path.dirname(__filedir__)
 
 import torndb
-import portalocker
-from portalocker import lock, unlock, LOCK_EX
 
 urls = (
         "/qvod_submit_task", "task_submit",
@@ -98,27 +97,26 @@ class task_submit:
         ErrorCode = 0
         ErrorMessage = "success"
 
-        with file(task_file, "r+") as f:
-            lock(f, LOCK_EX)
-            try:
-                taskQ = cPickle.load(f)
-                for url in qvod_urls:
-                    if url.__class__ is unicode:
-                        url = url.encode('utf-8')
-                    if not self.valid_url(url):
-                        ErrorCode = 100
-                        ErrorMessage = "input error"
-                    taskQ.append(url)
-                s = cPickle.dumps(taskQ)
-                f.seek(0,0)
-                f.truncate()
-                f.write(s)
-            except Exception, err:
-                ErrorCod = -1
-                ErrorMessage = "server error"
-                print traceback.format_exc()
-            unlock(f)
-        
+        with FileLock(task_file):
+            with file(task_file, "r+") as f:
+                try:
+                    taskQ = cPickle.load(f)
+                    for url in qvod_urls:
+                        if url.__class__ is unicode:
+                            url = url.encode('utf-8')
+                        if not self.valid_url(url):
+                            ErrorCode = 100
+                            ErrorMessage = "input error"
+                        taskQ.append(url)
+                    s = cPickle.dumps(taskQ)
+                    f.seek(0,0)
+                    f.truncate()
+                    f.write(s)
+                except Exception, err:
+                    ErrorCod = -1
+                    ErrorMessage = "server error"
+                    print traceback.format_exc()
+            
         resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
         return simplejson.dumps(resp)
 

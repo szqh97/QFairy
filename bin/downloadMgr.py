@@ -10,8 +10,7 @@ import torndb
 import cPickle
 import logging
 import logging.config
-import portalocker
-from portalocker import lock, unlock, LOCK_EX
+from filelock import FileLock
 import traceback
 import threading
 import downloader
@@ -47,28 +46,27 @@ class downloaderMgr(threading.Thread):
         if len(self.down_processes) == 0:
             tasks = []
             taskQ = None
-            with file(task_pickle, "r+") as f:
-                lock(f, LOCK_EX)
-                try:
-                    taskQ = cPickle.load(f)
-                    if len(taskQ):
-                        logger.info("taskQ: %s" % str(taskQ))
-                except EOFError, e:
-                    logger.info ("there is no task to download.")
-
-                for i in xrange(concur_num):
-                    qvod_url = ""
+            with FileLock(task_pickle):
+                with file(task_pickle, "r+") as f:
                     try:
-                        qvod_url = taskQ.popleft()
-                    except IndexError, e :
-                        break
-                    tasks.append(qvod_url)
+                        taskQ = cPickle.load(f)
+                        if len(taskQ):
+                            logger.info("taskQ: %s" % str(taskQ))
+                    except EOFError, e:
+                        logger.info ("there is no task to download.")
 
-                s = cPickle.dumps(taskQ)
-                f.seek(0,0)
-                f.truncate()
-                f.write(s)
-                unlock(f)
+                    for i in xrange(concur_num):
+                        qvod_url = ""
+                        try:
+                            qvod_url = taskQ.popleft()
+                        except IndexError, e :
+                            break
+                        tasks.append(qvod_url)
+
+                    s = cPickle.dumps(taskQ)
+                    f.seek(0,0)
+                    f.truncate()
+                    f.write(s)
 
             print tasks
             for t in tasks:
@@ -87,17 +85,16 @@ class downloaderMgr(threading.Thread):
         
         if need_start:
             qvod_urls = []
-            with file (task_pickle, "r+") as f:
-                lock(f, LOCK_EX)
-                taskQ = cPickle.load(f)
-                for i in xrange(need_start):
-                    qvod_url = taskQ.popleft()
-                    qvod_urls.append(qvod_url)
-                s = cPickle.dumps(taskQ)
-                f.seek(0,0)
-                f.truncate()
-                f.write(s)
-                unlock(f)
+            with FileLock(task_pickle):
+                with file (task_pickle, "r+") as f:
+                    taskQ = cPickle.load(f)
+                    for i in xrange(need_start):
+                        qvod_url = taskQ.popleft()
+                        qvod_urls.append(qvod_url)
+                    s = cPickle.dumps(taskQ)
+                    f.seek(0,0)
+                    f.truncate()
+                    f.write(s)
             for qvod_url in qvod_urls:
                 t = threading.Thread(target = qvod_download_proc, args = (self.config, qvod_url))
                 self.down_processes.append(t)
