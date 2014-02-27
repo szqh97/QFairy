@@ -6,7 +6,6 @@ import os
 import sys
 import time
 import Queue
-import torndb
 import cPickle
 import logging
 import logging.config
