@@ -160,7 +160,7 @@ def download_proc(qvod_url, frename = ""):
                 else:
                     logger.error("Cannot move the cache file to video path")
             elif __platform__ == "WIN":
-                if not os.system("move " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
+                if not os.system("move /y " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
                     os.system("rmdir /s " + cache_dir)
                 else:
                     logger.error("Cannot move the cache file to video path")

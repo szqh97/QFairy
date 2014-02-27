@@ -7,6 +7,7 @@ import web
 import re
 import os
 import sys
+import cPickle
 import traceback
 import collections
 import simplejson
@@ -53,6 +54,7 @@ def load_config():
     config_dict["VIDEO_PATH"] = config.get("Qconfig", "VIDEO_PATH")
     config_dict["CACHE_PATH"] = config.get("Qconfig", "CACHE_PATH")
     config_dict["QVODTASK_FILE"] = config.get("Qconfig", "QVODTASK_FILE")
+    config_dict["DOWN_PREX"] = config.get("Qconfig", "DOWN_PREX")
     return config_dict
 
 
@@ -86,11 +88,12 @@ class task_submit:
 
     def POST(self):
         config = self.config
-        task_file = confi['QVODTASK_FILE']
+        task_file = config['QVODTASK_FILE']
         task_file = os.path.normpath(os.path.join(__HOME__, task_file))
         raw_data = web.data()
         post_data = simplejson.loads(raw_data)
         qvod_urls = post_data.get("qvod_urls")
+        print "xxxxxxxxxxxxxxxx"
 
         ErrorCode = 0
         ErrorMessage = "success"
@@ -100,6 +103,8 @@ class task_submit:
             try:
                 taskQ = cPickle.load(f)
                 for url in qvod_urls:
+                    if url.__class__ is unicode:
+                        url = url.encode('utf-8')
                     if not self.valid_url(url):
                         ErrorCode = 100
                         ErrorMessage = "input error"
@@ -125,6 +130,7 @@ class task_query:
 
     def GET(self):
         config = self.config
+        down_prex = config["DOWN_PREX"]
         params = web.input()
         ErrorCode = 2
         ErrorMessage = "initialized"
@@ -143,25 +149,24 @@ class task_query:
         if len(qvod_url) == 0 or len(hash_code) == 0:
             ErrorCode = 100
             ErrorMesage = "input error"
+        
+        cache_dir = os.path.normpath(os.path.join(cache_path, hash_code))
+        err_cache = os.path.normpath(os.path.join(cache_path, hash_code + ".err"))
+        if os.path.exists(err_cache):
+            ErrorCode = 3
+            ErrorMessage = "download error!"
+        elif os.path.exists(cache_dir):
+            ErrorCdoe = 1
+            ErrorMessage = "processing"
 
-        res = None
-        try:
-            conn = db_conn()
-            sql = "select status,download_url from qvod_tasks where hash_code = '%s'" % hash_code
-            print sql
-            res = conn.get(sql)
-            conn.close()
-        except Exception, err:
-            ErrorCode = -1
-            ErrorMessage = "server error"
-            web.debug("error: %s", str(traceback.format_exc()))
-        if res:
-            ErrorMessage = res.status
-            ErrorCode = status_dict[res.status]
-            DownloadURL = res.download_url
         else:
-            ErrorCode = 100
-            ErrorMessage = "input error"
+            files = os.listdir(video_path)
+            queryfile = [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE)]
+            if len (queryfile) != 0:
+
+                ErrorCode = 0
+                ErrorMessage = "succeed"
+                DownloadURL = down_prex + queryfile[0]
 
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
         return simplejson.dumps(resp)
@@ -171,8 +176,8 @@ class deletefile:
         self.config = load_config()
 
     def POST(self):
-        ErroCode = 0
-        cmd = "success"
+        ErrorCode = 0
+        ErrorMessage = "success"
         config = self.config
         video_path = config["VIDEO_PATH"]
         cache_path = config["CACHE_PATH"]
@@ -182,16 +187,28 @@ class deletefile:
         req = simplejson.loads(raw_data)
         hash_list = req["hashid_list"]
         files = os.listdir(video_path)
+        print files
+        exist_files = []
         for hash_code in hash_list:
-            exist_files = [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE) and os.isfile(f)]
+            
+            exist_files += [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE) and os.path.isfile(os.path.normpath(os.path.join(video_path, f)))]
+            print exist_files, 'xxx'
+        if len(exist_files) == 0:
+            ErrorCode = 100
+            ErrorMessage = "input error"
+            resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
+            return simplejson.dumps(resp)
+
         exist_files = [ os.path.normpath(os.path.join(video_path,f)) for f in exist_files ]
+        print exist_files
         files2del = ' '.join(exist_files)
         
+        cmd = ''
         if os.name == 'posix':
             cmd = "rm -f %s" % files2del
-        elif os.name = 'nt':
+        elif os.name == 'nt':
             cmd = "del /q %s" % files2del
-        if not os.system(cmd):
+        if os.system(cmd) != 0:
             ErrorCode = -1
             ErrorMessage = "server error: delete files error"
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
