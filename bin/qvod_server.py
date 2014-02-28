@@ -115,15 +115,14 @@ class task_query:
         cache_path = config["CACHE_PATH"]
         video_path = os.path.normpath(os.path.join(__HOME__, video_path))
         cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
-        if params.has_key("qvod_url"):
-            qvod_url = params["qvod_url"]
-            hash_code = qvod_url.split('|')[1]
         if params.has_key("hash_code"):
             hash_code = params["hash_code"]
-        if len(qvod_url) == 0 or len(hash_code) == 0:
+        if  len(hash_code) == 0:
             ErrorCode = 100
             ErrorMesage = "input error"
-        
+            resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
+            return simplejson.dumps(resp)
+            
         cache_dir = os.path.normpath(os.path.join(cache_path, hash_code))
         err_cache = os.path.normpath(os.path.join(cache_path, hash_code + ".err"))
         if os.path.exists(err_cache):
@@ -141,6 +140,9 @@ class task_query:
                 ErrorCode = 0
                 ErrorMessage = "succeed"
                 DownloadURL = down_prex + queryfile[0]
+            else:
+                ErrorCode = 100
+                ErrorMessage = "input error"
 
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
         return simplejson.dumps(resp)
