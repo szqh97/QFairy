@@ -75,20 +75,24 @@ class downloaderMgr(threading.Thread):
             time.sleep(5)
             return 
         
-        need_start = 0
+        need_start = False
         for t in self.down_processes:
             if not t.is_alive():
                 self.down_processes.remove(t)
-                ++need_start
         
+        if len(self.down_processes) < concur_num:
+            need_start = True
         if need_start:
             qvod_urls = []
             with FileLock(task_pickle):
                 with file (task_pickle, "r+") as f:
                     taskQ = cPickle.load(f)
-                    for i in xrange(need_start):
-                        qvod_url = taskQ.popleft()
-                        qvod_urls.append(qvod_url)
+                    for i in xrange(concur_num - len(self.down_processes)):
+                        try:
+                            qvod_url = taskQ.popleft()
+                            qvod_urls.append(qvod_url)
+                        except IndexError, e:
+                            pass 
                     s = cPickle.dumps(taskQ)
                     f.seek(0,0)
                     f.truncate()
@@ -113,6 +117,7 @@ def qvod_download_proc(config, qvod_url):
     """
     cache_path = config["CACHE_PATH"]
     down_prex = config["DOWN_PREX"]
+    cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
 
     if qvod_url.__class__ is unicode:
         qvod_url = qvod_url.encode("utf-8")

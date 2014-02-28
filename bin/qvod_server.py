@@ -131,26 +131,23 @@ class task_query:
                 if hash_list.count(hash_code) == 0:
                     ErrorCode = 100
                     ErrorMessage = "input error"
-                    resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
-                    return simplejson.dumps(resp)
             
         cache_dir = os.path.normpath(os.path.join(cache_path, hash_code))
         err_cache = os.path.normpath(os.path.join(cache_path, hash_code + ".err"))
+
+        files = os.listdir(video_path)
+        queryfile = [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE)]
         if os.path.exists(err_cache):
             ErrorCode = 3
             ErrorMessage = "download error!"
         elif os.path.exists(cache_dir):
-            ErrorCdoe = 1
+            ErrorCode = 1
             ErrorMessage = "processing"
 
-        else:
-            files = os.listdir(video_path)
-            queryfile = [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE)]
-            if len (queryfile) != 0:
-
-                ErrorCode = 0
-                ErrorMessage = "succeed"
-                DownloadURL = down_prex + queryfile[0]
+        elif len(queryfile) != 0:
+            ErrorCode = 0
+            ErrorMessage = "succeed"
+            DownloadURL = down_prex + queryfile[0]
 
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
         return simplejson.dumps(resp)
