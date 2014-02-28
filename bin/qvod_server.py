@@ -81,7 +81,7 @@ class task_submit:
                         if not self.valid_url(url):
                             ErrorCode = 100
                             ErrorMessage = "input error"
-                        h = url.split('|')[2]
+                        h = url.split('|')[1]
                         if len ([ t for t in taskQ if re.match('.*' + h + ',*', t, re.IGNORECASE) ]) == 0:
                             taskQ.append(url)
                     s = cPickle.dumps(taskQ)
@@ -104,6 +104,8 @@ class task_query:
 
     def GET(self):
         config = self.config
+        task_file = config['QVODTASK_FILE']
+        task_file = os.path.normpath(os.path.join(__HOME__, task_file))
         down_prex = config["DOWN_PREX"]
         params = web.input()
         ErrorCode = 2
@@ -122,6 +124,15 @@ class task_query:
             ErrorMesage = "input error"
             resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
             return simplejson.dumps(resp)
+        with FileLock(task_file):
+            with file(task_file, 'r') as f:
+                taskq = cPickle.load(f)
+                hash_list = [t.split('|')[1] for t in taskq ]
+                if hash_list.count(hash_code) == 0:
+                    ErrorCode = 100
+                    ErrorMessage = "input error"
+                    resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
+                    return simplejson.dumps(resp)
             
         cache_dir = os.path.normpath(os.path.join(cache_path, hash_code))
         err_cache = os.path.normpath(os.path.join(cache_path, hash_code + ".err"))
@@ -140,9 +151,6 @@ class task_query:
                 ErrorCode = 0
                 ErrorMessage = "succeed"
                 DownloadURL = down_prex + queryfile[0]
-            else:
-                ErrorCode = 100
-                ErrorMessage = "input error"
 
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
         return simplejson.dumps(resp)

@@ -139,9 +139,9 @@ def qvod_download_proc(config, qvod_url):
         if os.name == 'posix':
             cmd = "mv %s %s" % (old_cache, err_cache)
         elif os.name == 'nt':
-            cmd = "rename %s %s" % (old_cache, err_cache)
+            cmd = "move /y %s %s" % (old_cache, err_cache)
         if os.system(cmd):
-            logger.error("rename %s -> %s failed", old_cache, err_cache)
+            logger.error("move %s -> %s failed", old_cache, err_cache)
 
 if __name__ == '__main__':
     install_logger()
