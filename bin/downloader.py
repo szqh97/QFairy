@@ -5,6 +5,7 @@
 
 import os
 import re
+import shutil
 import sys
 import time
 import thread
@@ -109,21 +110,18 @@ def download_proc(qvod_url, frename = ""):
     download_exe =  frename + '_' + hash_code + ".exe"
     cmd = ""
     p_downloder = None
+    dstfile = cache_dir + os.sep + download_exe
+    try:
+        shutil.copyfile(__INSTALLER__, dstfile)
+    except Exception, err:
+        logger.error("generate download exe error!")
+        return False
     if os.name == 'posix':
-        cmd = "cp " + __INSTALLER__ + ' ' + cache_dir + os.sep + download_exe
-        if not os.system(cmd):
-            p_downloder = subprocess.Popen(["wine", donotescapespace(cache_dir + os.sep + download_exe)],
-                    stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        else:
-            logger.error("generate download exe error!")
-
+        p_downloder = subprocess.Popen(["wine", donotescapespace(cache_dir + os.sep + download_exe)],
+                stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     elif os.name == 'nt':
-        cmd = "copy " + __INSTALLER__ + ' ' + cache_dir + os.sep + download_exe
-        if not os.system(cmd):
-            p_downloder = subprocess.Popen([donotescapespace(cache_dir + os.sep + download_exe)], 
-                    stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        else:
-            logger.error("generate download exe error!")
+        p_downloder = subprocess.Popen([donotescapespace(cache_dir + os.sep + download_exe)], 
+                stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     
     # update downloading progress
     cache =  frename+ ".!qd"
@@ -134,17 +132,19 @@ def download_proc(qvod_url, frename = ""):
     while True:
         if os.path.isfile(donotescapespace(cache_dir + os.sep + complete)):
             p_downloder.terminate()
-            if os.name == 'posix':
-                if not os.system("mv " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
-                    os.system("rm -rf " + cache_dir)
-                else:
-                    logger.error("Cannot move the cache file to video path")
-            elif os.name == 'nt':
-                if not os.system("move /y " + cache_dir + os.sep + complete + ' ' + video_path + os.sep + complete):
-                    os.system("rmdir /s /q " + cache_dir)
-                else:
-                    logger.error("Cannot move the cache file to video path")
-            b_successed = True
+            time.sleep(2)
+            rst = cache_dir + os.sep + complete 
+            dst = video_path + os.sep + complete
+            try:
+                shutil.move(rst, dst)
+            except Exception, err:
+                logger.error("Cannot move the cache file to video path")
+            try:
+                shutil.rmtree(cache_dir)
+                b_successed = True
+            except Exception, err:
+                logger.error("rm cachedir: %s error", cache_dir)
+
             break
             
         cur_time = time.time()
