@@ -109,7 +109,7 @@ def download_proc(qvod_url, frename = ""):
     # copy setup.exe to hashcode+movie_hasicode.exe
     download_exe =  frename + '_' + hash_code + ".exe"
     cmd = ""
-    p_downloder = None
+    p_downloader = None
     dstfile = cache_dir + os.sep + download_exe
     try:
         shutil.copyfile(__INSTALLER__, dstfile)
@@ -117,10 +117,10 @@ def download_proc(qvod_url, frename = ""):
         logger.error("generate download exe error!")
         return False
     if os.name == 'posix':
-        p_downloder = subprocess.Popen(["wine", donotescapespace(cache_dir + os.sep + download_exe)],
+        p_downloader = subprocess.Popen(["wine", donotescapespace(cache_dir + os.sep + download_exe)],
                 stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     elif os.name == 'nt':
-        p_downloder = subprocess.Popen([donotescapespace(cache_dir + os.sep + download_exe)], 
+        p_downloader = subprocess.Popen([donotescapespace(cache_dir + os.sep + download_exe)], 
                 stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     
     # update downloading progress
@@ -131,7 +131,8 @@ def download_proc(qvod_url, frename = ""):
     last_update = start_time
     while True:
         if os.path.isfile(donotescapespace(cache_dir + os.sep + complete)):
-            p_downloder.terminate()
+            p_downloader.terminate()
+            p_downloader.wait()
             time.sleep(2)
             rst = cache_dir + os.sep + complete 
             dst = video_path + os.sep + complete
@@ -150,7 +151,8 @@ def download_proc(qvod_url, frename = ""):
         cur_time = time.time()
         passed_time = cur_time - start_time
         if cur_time - last_update >= timeout:
-            p_downloder.terminate()
+            p_downloader.terminate()
+            p_downloader.wait()
             logger.info("time out kill downloader")
             b_successed = False
             break
