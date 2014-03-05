@@ -81,6 +81,8 @@ class task_submit:
                         if not self.valid_url(url):
                             ErrorCode = 100
                             ErrorMessage = "input error"
+                            resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
+                            return simplejson.dumps(resp)
                         h = url.split('|')[1]
                         if len ([ t for t in taskQ if re.match('.*' + h + ',*', t, re.IGNORECASE) ]) == 0:
                             taskQ.append(url)
