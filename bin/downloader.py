@@ -28,16 +28,20 @@ def install_logger():
 install_logger()
 
 def load_config():
-    config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
-    config = ConfigParser()
-    config_dict = {}
-    config.read(config_file)
-    config_dict["VIDEO_PATH"] = config.get("Qconfig", "VIDEO_PATH") # TODO set a default path
-    config_dict["CACHE_PATH"] = config.get("Qconfig", "CACHE_PATH") # TODO set a default path
-    config_dict["TIMEOUT"] = config.get("Qconfig", "TIMEOUT") # TODO set a default path
-    config_dict["CONCUR_NUM"] = config.get("Qconfig", "CONCUR_NUM") # FIXME use database instead it
-    config_dict["DOWN_PREX"] = config.get("Qconfig", "DOWN_PREX")
-    config_dict["QVODTASK_FILE"] = config.get("Qconfig", "QVODTASK_FILE")
+    try:
+        config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
+        config = ConfigParser()
+        config_dict = {}
+        config.read(config_file)
+        config_dict["VIDEO_PATH"] = config.get("Qconfig", "VIDEO_PATH") # TODO set a default path
+        config_dict["CACHE_PATH"] = config.get("Qconfig", "CACHE_PATH") # TODO set a default path
+        config_dict["TIMEOUT"] = config.get("Qconfig", "TIMEOUT") # TODO set a default path
+        config_dict["CONCUR_NUM"] = config.get("Qconfig", "CONCUR_NUM") # FIXME use database instead it
+        config_dict["DOWN_PREX"] = config.get("Qconfig", "DOWN_PREX")
+        config_dict["QVODTASK_FILE"] = config.get("Qconfig", "QVODTASK_FILE")
+        config_dict["QVODTASK_DB"] = config.get("Qconfig", "QVODTASK_DB")
+    except Exception, err:
+        logger.error("get config error: %s",err) 
     return config_dict
 
 def verify_url(qvod_url):
