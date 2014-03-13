@@ -66,8 +66,6 @@ class task_submit:
 
     def POST(self):
         config = self.config
-        task_file = config['QVODTASK_FILE']
-        task_file = os.path.normpath(os.path.join(__HOME__, task_file))
         raw_data = web.data()
         post_data = simplejson.loads(raw_data)
         qvod_urls = None
@@ -98,30 +96,6 @@ class task_submit:
         
         sqlite_exec(dbname, sql)
 
-#        with FileLock(task_file):
-#            with file(task_file, "r+") as f:
-#                try:
-#                    taskQ = cPickle.load(f)
-#                    for url in qvod_urls:
-#                        if url.__class__ is unicode:
-#                            url = url.encode('utf-8')
-#                        if not self.valid_url(url):
-#                            ErrorCode = 100
-#                            ErrorMessage = "input error"
-#                            resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
-#                            return simplejson.dumps(resp)
-#                        h = url.split('|')[1]
-#                        if len ([ t for t in taskQ if re.match('.*' + h + ',*', t, re.IGNORECASE) ]) == 0:
-#                            taskQ.append(url)
-#                    s = cPickle.dumps(taskQ)
-#                    f.seek(0,0)
-#                    f.truncate()
-#                    f.write(s)
-#                except Exception, err:
-#                    ErrorCod = -1
-#                    ErrorMessage = "server error"
-#                    print traceback.format_exc()
-#            
         resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
         return simplejson.dumps(resp)
 
