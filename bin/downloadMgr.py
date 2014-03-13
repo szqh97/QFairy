@@ -10,6 +10,7 @@ import cPickle
 import logging
 import logging.config
 from filelock import FileLock
+from sqliteutils import qvod_exec, qvod_query
 import traceback
 import multiprocessing
 from multiprocessing import Process
@@ -116,9 +117,11 @@ def qvod_download_proc(config, qvod_url):
     start downloader.download_proc,
     update db
     """
+    dbname = config["QVODTASK_DB"]
     cache_path = config["CACHE_PATH"]
     down_prex = config["DOWN_PREX"]
     cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
+    dbname = os.path.normpath(os.path.join(__HOME__, dbname))
 
     if qvod_url.__class__ is unicode:
         qvod_url = qvod_url.encode("utf-8")
@@ -137,17 +140,13 @@ def qvod_download_proc(config, qvod_url):
     filename = hash_code + suffix
     ret = downloader.download_proc(qvod_url, filename)
     
-    # download error move 4AD312D81D59DDBC7684139892E1A41C51C4C094/ to4AD312D81D59DDBC7684139892E1A41C51C4C094.err/ in cache dir
-    if not ret:
-        old_cache = os.path.normpath(os.path.join(cache_path, hash_code))
-        err_cache = os.path.normpath(os.path.join(cache_path, hash_code + ".err"))
-        cmd = ""
-        if os.name == 'posix':
-            cmd = "mv %s %s" % (old_cache, err_cache)
-        elif os.name == 'nt':
-            cmd = "move /y %s %s" % (old_cache, err_cache)
-        if os.system(cmd):
-            logger.error("move %s -> %s failed", old_cache, err_cache)
+    sql = ""
+    if ret:
+        sql = "update qvod_task set status = 'error' where hash_code = '%s' " % hash_code
+    else:
+        sql = "update qvod_task set status = 'succed' where hash_code = '%s' " % hash_code
+    qvod_exec(dbname, sql)
+    
 
 if __name__ == '__main__':
     install_logger()
