@@ -18,7 +18,7 @@ def sqlite_query(dbname, sql):
     items = None
     try:
         with FileLock(dbname, timeout = 30):
-            conn = sqlite3.connect(testdb)
+            conn = sqlite3.connect(dbname)
             cursor = conn.cursor()
             cursor.execute(sql)
             items = cursor.fetchall()
@@ -31,7 +31,7 @@ def sqlite_exec(dbname, sql):
     valid_db(dbname)
     try:
         with FileLock(dbname, timeout = 30):
-            conn = sqlite3.connect(testdb)
+            conn = sqlite3.connect(dbname)
             cursor = conn.cursor()
             cursor.execute(sql)
             conn.commit()
