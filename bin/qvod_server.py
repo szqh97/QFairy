@@ -6,6 +6,7 @@
 import web
 import re
 import os
+import sqlite3
 import sys
 import cPickle
 import traceback
@@ -24,6 +25,7 @@ urls = (
         "/qvod_submit_task", "task_submit",
         "/qvod_query_task", "task_query",
         "/qvod_delete_file", "deletefile",
+        "/qvod_kill_downloader", "killdownloader",
         )
 
 
@@ -185,10 +187,31 @@ class killdownloader:
             return simplejson.dumps(resp)
         if hash_code.__class__ is unicode: 
             hash_code = hash_code.encode('utf-8')
-        sql = "select downloader_pid from qvod_task where hash_code = '%s'" % hash_code
+
+        # kill the downloader process and delete task from db, this task may retried
+        sql = "select downlaoder_pid from qvod_task where status = 'processing' and hash_code = '%s'" % hash_code
         with FileLock(dbname, timeout=30):
-            
-        res = sqlite_query(dbname, sql)
+            try:
+                conn = sqlite3.connect(dbname)
+                cursor = conn.cursor()
+                cursor.execute(sql)
+                item = cursor.fetchall()
+                if len(item) == 0:
+                    ErrorCode = 100
+                    ErrorMessage = "input error"
+                    resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage}
+                    return simplejson.dumps(resp)
+                pid = int(item[0][0])
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except OSError:
+                    print str(traceback.format_exc())
+                sql = "delete from qvod_task where hash_code = '%s' " % hash_code
+                cursor.execute(sql)
+                conn.commit()
+                conn.close()
+            except Exception, err:
+                print str(traceback.format_exc())
 
 class deletefile:
     def __init__(self):
