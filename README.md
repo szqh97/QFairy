@@ -2,6 +2,7 @@ QFairy
 ======
 
 download qvod movie 
+This version is use filelock and sqlite
 
 dependences
 =========
