@@ -5,6 +5,7 @@
 
 import os
 import re
+import signal
 import shutil
 import sys
 import time
@@ -13,11 +14,19 @@ import logging
 import logging.config
 import subprocess
 from ConfigParser import ConfigParser
+quit = False
 
 __filedir__ = os.path.dirname(os.path.abspath(__file__))
 __HOME__ = os.path.dirname(__filedir__)
 __INSTALLER__ = "QvodSetup.exe"
 __INSTALLER__ = os.path.normpath(os.path.join(__HOME__, "bin", __INSTALLER__))
+
+def signal_handler_for_terminate(signum, frame):
+    global quit
+    quit = True
+ 
+def install_signal_handlers():
+    signal.signal(signal.SIGTERM, signal_handler_for_terminate)
 
 logger = logging
 def install_logger():
@@ -25,6 +34,7 @@ def install_logger():
     
     logger.config.fileConfig(os.path.normpath(os.path.join(__HOME__, "config", "logging.conf")))
     logger = logger.getLogger("QvodDownloader")
+install_signal_handlers()
 install_logger()
 
 def load_config():
@@ -133,7 +143,8 @@ def download_proc(qvod_url, frename = ""):
     b_successed = False
     start_time = time.time()
     last_update = start_time
-    while True:
+    while quit is False:
+        print "ininini"
         if os.path.isfile(donotescapespace(cache_dir + os.sep + complete)):
             p_downloader.terminate()
             p_downloader.wait()
@@ -160,10 +171,22 @@ def download_proc(qvod_url, frename = ""):
             logger.info("time out kill downloader")
             b_successed = False
             break
-        time.sleep(5)
+        time.sleep(1)
+    print "ouou", b_successed
     if b_successed:
         logger.info("file %s download completed!", complete)
         return True
+    else:
+        # receive SIGTERM
+        #FIXME update db
+        try:
+            p_downloader.terminate()
+            p_downloader.wait()
+            shutil.rmtree(cache_dir)
+            logger.info("process killed, %s ", hash_code)
+        except Exception, err:
+            logger.error("kill process %s error:%s", hash_code, err)
+
     return False
 
 # for test only
