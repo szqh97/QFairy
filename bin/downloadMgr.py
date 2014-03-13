@@ -11,6 +11,8 @@ import logging
 import logging.config
 from filelock import FileLock
 import traceback
+import multiprocessing
+from multiprocessing import Process
 import threading
 import downloader
 import multiprocessing
@@ -25,12 +27,11 @@ def install_logger():
     logger.config.fileConfig(os.path.normpath(os.path.join(__HOME__, "config", "logging.conf")))
     logger = logger.getLogger("QvodDownloader")
 
-class downloaderMgr(threading.Thread):
+class downloaderMgr():
     """
      Manager downloader process
     """
     def __init__(self):
-        threading.Thread.__init__(self)
         self.config = downloader.load_config()
         self.cur_task_id = 0
         self.taskQ = Queue.Queue()
@@ -68,9 +69,9 @@ class downloaderMgr(threading.Thread):
                     f.write(s)
 
             for t in tasks:
-                self.down_processes.append(threading.Thread(target = qvod_download_proc, args = (self.config, t)))
+                self.down_processes.append(Process(target = qvod_download_proc, args = (self.config, t)))
             for t in self.down_processes:
-                t.setDaemon(True)
+                t.daemon = True
                 t.start()
             time.sleep(5)
             return 
@@ -98,9 +99,9 @@ class downloaderMgr(threading.Thread):
                     f.truncate()
                     f.write(s)
             for qvod_url in qvod_urls:
-                t = threading.Thread(target = qvod_download_proc, args = (self.config, qvod_url))
+                t = Process(target = qvod_download_proc, args = (self.config, qvod_url))
                 self.down_processes.append(t)
-                t.setDaemon(True)
+                t.daemon = True
                 t.start()
         
         time.sleep(5)
@@ -150,8 +151,8 @@ def qvod_download_proc(config, qvod_url):
 
 if __name__ == '__main__':
     install_logger()
+    downloader.install_signal_handlers()
     logger.info("download Manager starting ...")
     Mgr = downloaderMgr()
-    Mgr.setDaemon(False)
-    Mgr.start()
+    Mgr.run()
 
