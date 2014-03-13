@@ -2,8 +2,6 @@
 import os
 import threading
 import time
-import portalocker
-from portalocker import lock, unlock, LOCK_SH
 from filelock import FileLock
 def func():
 	start = time.time()
@@ -19,10 +17,10 @@ def func():
 	
 taskq = []
 
-for i in xrange(40):
+for i in xrange(10):
 	taskq.append(threading.Thread(target = func, args = ()))
 for t in taskq:
 	t.setDaemon(True)
 	t.start()
 
-time.sleep(15)
+time.sleep(500*0.3)
