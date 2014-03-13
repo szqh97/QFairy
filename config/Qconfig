@@ -12,6 +12,7 @@ TIMEOUT = 600
 RECORD = ./qvod/qvod_urls
 # qvod task db
 QVODTASK_FILE = ./config/qvod_tasks.pk
+QVODTASK_DB = ./config/qvod_tasks.db
 
 # concurrent number of qvod downloader
 CONCUR_NUM = 2
