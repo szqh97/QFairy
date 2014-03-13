@@ -245,12 +245,11 @@ class deletefile:
         print exist_files
         files2del = ' '.join(exist_files)
         
-        cmd = ''
-        if os.name == 'posix':
-            cmd = "rm -f %s" % files2del
-        elif os.name == 'nt':
-            cmd = "del /q %s" % files2del
-        if os.system(cmd) != 0:
+        if not os.path.isfile(file2del):
+            print file2del, "is not file"
+            ErrorCode = -1
+            ErrorMessage = "server error: delete files error"
+        if os.remove(file2del) != 0:
             ErrorCode = -1
             ErrorMessage = "server error: delete files error"
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
