@@ -133,51 +133,62 @@ class task_query:
         config = self.config
         dbname = config['QVODTASK_DB']
         dbname = os.path.normpath(os.path.join(__HOME__, dbname))
+
         down_prex = config["DOWN_PREX"]
+
         params = web.input()
         ErrorCode = 2
         ErrorMessage = "initialized"
         DownloadURL = ""
         qvod_url = ""
         hash_code = ""
-        video_path = config["VIDEO_PATH"]
-        cache_path = config["CACHE_PATH"]
-        video_path = os.path.normpath(os.path.join(__HOME__, video_path))
-        cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
+
         if params.has_key("hash_code"):
             hash_code = params["hash_code"]
-        if  len(hash_code) == 0:
+        if len(hash_code) == 0:
             ErrorCode = 100
             ErrorMesage = "input error"
             resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
             return simplejson.dumps(resp)
-        with FileLock(task_file):
-            with file(task_file, 'r') as f:
-                taskq = cPickle.load(f)
-                hash_list = [t.split('|')[1] for t in taskq ]
-                if hash_list.count(hash_code) == 0:
-                    ErrorCode = 100
-                    ErrorMessage = "input error"
-            
-        cache_dir = os.path.normpath(os.path.join(cache_path, hash_code))
-        err_cache = os.path.normpath(os.path.join(cache_path, hash_code + ".err"))
+        if hash_code.__class__ is unicode: 
+            hash_code = hash_code.encode('utf-8')
+        sql = "select status from qvod_task where hash_code = '%s'" % hash_code
+        res = sqlite_query(dbname, sql)
 
-        files = os.listdir(video_path)
-        queryfile = [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE)]
-        if os.path.exists(err_cache):
-            ErrorCode = 3
-            ErrorMessage = "download error!"
-        elif os.path.exists(cache_dir):
-            ErrorCode = 1
-            ErrorMessage = "processing"
+        if len(res) == 0:
+            ErrorCode = 100
+            ErrorMessage = "input error"
+            resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
+            return simplejson.dumps(resp)
 
-        elif len(queryfile) != 0:
-            ErrorCode = 0
-            ErrorMessage = "succeed"
-            DownloadURL = down_prex + queryfile[0]
-
+        status = res[0][0]
+        ErrorMessage = status
+        ErrorCode = status_dict[status]
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
         return simplejson.dumps(resp)
+
+class killdownloader:
+    def __init__(self):
+        self.config = load_config()
+    def GET(self):
+        config = self.config
+        dbname = config['QVODTASK_DB']
+        dbname = os.path.normpath(os.path.join(__HOME__, dbname))
+        params = web.input()
+
+        if params.has_key("hash_code"):
+            hash_code = params["hash_code"]
+        if len(hash_code) == 0:
+            ErrorCode = 100
+            ErrorMesage = "input error"
+            resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
+            return simplejson.dumps(resp)
+        if hash_code.__class__ is unicode: 
+            hash_code = hash_code.encode('utf-8')
+        sql = "select downloader_pid from qvod_task where hash_code = '%s'" % hash_code
+        with FileLock(dbname, timeout=30):
+            
+        res = sqlite_query(dbname, sql)
 
 class deletefile:
     def __init__(self):
