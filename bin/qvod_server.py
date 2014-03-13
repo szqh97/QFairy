@@ -13,6 +13,7 @@ import collections
 import simplejson
 from filelock import FileLock
 from ConfigParser import ConfigParser
+from sqliteutils import sqlite_query, sqlite_exec
 
 #FIXME add path environment varibles if run it as moudule of apache
 #sys.path.append(os.path.normpath(os.path.join(sys.path[0], "")))
@@ -43,6 +44,7 @@ def load_config():
     config_dict["VIDEO_PATH"] = config.get("Qconfig", "VIDEO_PATH")
     config_dict["CACHE_PATH"] = config.get("Qconfig", "CACHE_PATH")
     config_dict["QVODTASK_FILE"] = config.get("Qconfig", "QVODTASK_FILE")
+    config_dict["QVODTASK_DB"] = config.get("Qconfig", "QVODTASK_DB")
     config_dict["DOWN_PREX"] = config.get("Qconfig", "DOWN_PREX")
     return config_dict
 
@@ -66,35 +68,58 @@ class task_submit:
         task_file = os.path.normpath(os.path.join(__HOME__, task_file))
         raw_data = web.data()
         post_data = simplejson.loads(raw_data)
-        qvod_urls = post_data.get("qvod_urls")
+        qvod_urls = None
+        try:
+            qvod_urls = post_data.get("qvod_urls")
+        except Exception, err:
+            ErrorCode = 100
+            ErrorMessage = "input error"
+            resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
+            return simplejson.dumps(resp)
+        print qvod_urls
 
         ErrorCode = 0
         ErrorMessage = "success"
+        sql = ''' insert or ignore into qvod_task ( qvod_url, hash_code, status) select '''
+        un_s = "union all select"
+        for url in qvod_urls:
+            if url.__class__ is unicode:
+                url = url.encode('utf-8')
+            hash_code = url.split('|')[1]
+            sql += ''' "%s", "%s", "initilized" ''' % (url, hash_code)
+            sql += un_s
+        sql = un_s.join(sql.split(un_s)[0:-1])
+        dbname = self.config["QVODTASK_DB"]
+        dbname = os.path.normpath(os.path.join(__HOME__, dbname))
+        print dbname
+        print sql
+        
+        sqlite_exec(dbname, sql)
 
-        with FileLock(task_file):
-            with file(task_file, "r+") as f:
-                try:
-                    taskQ = cPickle.load(f)
-                    for url in qvod_urls:
-                        if url.__class__ is unicode:
-                            url = url.encode('utf-8')
-                        if not self.valid_url(url):
-                            ErrorCode = 100
-                            ErrorMessage = "input error"
-                            resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
-                            return simplejson.dumps(resp)
-                        h = url.split('|')[1]
-                        if len ([ t for t in taskQ if re.match('.*' + h + ',*', t, re.IGNORECASE) ]) == 0:
-                            taskQ.append(url)
-                    s = cPickle.dumps(taskQ)
-                    f.seek(0,0)
-                    f.truncate()
-                    f.write(s)
-                except Exception, err:
-                    ErrorCod = -1
-                    ErrorMessage = "server error"
-                    print traceback.format_exc()
-            
+#        with FileLock(task_file):
+#            with file(task_file, "r+") as f:
+#                try:
+#                    taskQ = cPickle.load(f)
+#                    for url in qvod_urls:
+#                        if url.__class__ is unicode:
+#                            url = url.encode('utf-8')
+#                        if not self.valid_url(url):
+#                            ErrorCode = 100
+#                            ErrorMessage = "input error"
+#                            resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
+#                            return simplejson.dumps(resp)
+#                        h = url.split('|')[1]
+#                        if len ([ t for t in taskQ if re.match('.*' + h + ',*', t, re.IGNORECASE) ]) == 0:
+#                            taskQ.append(url)
+#                    s = cPickle.dumps(taskQ)
+#                    f.seek(0,0)
+#                    f.truncate()
+#                    f.write(s)
+#                except Exception, err:
+#                    ErrorCod = -1
+#                    ErrorMessage = "server error"
+#                    print traceback.format_exc()
+#            
         resp = {"ErrorCode":ErrorCode, "ErrorMessage":ErrorMessage}
         return simplejson.dumps(resp)
 
@@ -106,8 +131,8 @@ class task_query:
 
     def GET(self):
         config = self.config
-        task_file = config['QVODTASK_FILE']
-        task_file = os.path.normpath(os.path.join(__HOME__, task_file))
+        dbname = config['QVODTASK_DB']
+        dbname = os.path.normpath(os.path.join(__HOME__, dbname))
         down_prex = config["DOWN_PREX"]
         params = web.input()
         ErrorCode = 2
