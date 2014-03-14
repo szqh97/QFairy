@@ -89,8 +89,7 @@ class task_submit:
         sql = ''' insert or ignore into qvod_task ( qvod_url, hash_code, status) select '''
         un_s = "union all select"
         for url in qvod_urls:
-            if url.__class__ is unicode:
-                url = url.encode('utf-8')
+            url = utf8(url)
             hash_code = url.split('|')[1]
             sql += ''' "%s", "%s", "initialized" ''' % (url, hash_code)
             sql += un_s
@@ -132,9 +131,9 @@ class task_query:
             ErrorMessage = "input error"
             resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
             return simplejson.dumps(resp)
-        if hash_code.__class__ is unicode: 
-            hash_code = hash_code.encode('utf-8')
-        sql = "select status from qvod_task where hash_code = '%s'" % hash_code
+        hash_code = utf8(hash_code)
+
+        sql = "select status, download_url from qvod_task where hash_code = '%s'" % hash_code
         res = sqlite_query(dbname, sql)
 
         if len(res) == 0:
@@ -144,6 +143,8 @@ class task_query:
             return simplejson.dumps(resp)
 
         status = res[0][0]
+        DownloadURL = res[0][1]
+        if DownloadURL is None: DownloadURL = ""
         ErrorMessage = status
         ErrorCode = status_dict[status]
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
@@ -157,6 +158,8 @@ class killdownloader:
         dbname = config['QVODTASK_DB']
         dbname = os.path.normpath(os.path.join(__HOME__, dbname))
         params = web.input()
+        ErrorCode = 0
+        ErrorMessage = "success"
 
         if params.has_key("hash_code"):
             hash_code = params["hash_code"]
@@ -165,8 +168,7 @@ class killdownloader:
             ErrorMessage = "input error"
             resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
             return simplejson.dumps(resp)
-        if hash_code.__class__ is unicode: 
-            hash_code = hash_code.encode('utf-8')
+        hash_code = utf8(hash_code)
 
         # kill the downloader process and delete task from db, this task may retried
         sql = "select downloader_pid from qvod_task where status = 'processing' and hash_code = '%s'" % hash_code
@@ -194,6 +196,8 @@ class killdownloader:
                 print str(traceback.format_exc())
             finally:
                 conn.close()
+        resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage}
+        return simplejson.dumps(resp)
 
 class deletefile:
     def __init__(self):
