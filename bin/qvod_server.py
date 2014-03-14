@@ -86,7 +86,7 @@ class task_submit:
             if url.__class__ is unicode:
                 url = url.encode('utf-8')
             hash_code = url.split('|')[1]
-            sql += ''' "%s", "%s", "initilized" ''' % (url, hash_code)
+            sql += ''' "%s", "%s", "initialized" ''' % (url, hash_code)
             sql += un_s
         sql = un_s.join(sql.split(un_s)[0:-1])
         dbname = self.config["QVODTASK_DB"]
