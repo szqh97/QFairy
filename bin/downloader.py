@@ -144,7 +144,6 @@ def download_proc(qvod_url, frename = ""):
     start_time = time.time()
     last_update = start_time
     while quit is False:
-        print "ininini"
         if os.path.isfile(donotescapespace(cache_dir + os.sep + complete)):
             p_downloader.terminate()
             p_downloader.wait()
@@ -172,7 +171,6 @@ def download_proc(qvod_url, frename = ""):
             b_successed = False
             break
         time.sleep(1)
-    print "ouou", b_successed
     if b_successed:
         logger.info("file %s download completed!", complete)
         return True
