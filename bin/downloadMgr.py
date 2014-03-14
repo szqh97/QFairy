@@ -6,11 +6,12 @@ import os
 import sys
 import time
 import Queue
+import sqlite3
 import cPickle
 import logging
 import logging.config
 from filelock import FileLock
-from sqliteutils import qvod_exec, qvod_query
+from sqliteutils import sqlite_exec, sqlite_query
 import traceback
 import multiprocessing
 from multiprocessing import Process
@@ -22,6 +23,9 @@ logger = logging
 
 __filedir__ = os.path.dirname(os.path.abspath(__file__))
 __HOME__ = os.path.dirname(__filedir__)
+
+class EmptylistError(Exception):
+    pass
 
 def install_logger():
     global logger
@@ -38,90 +42,66 @@ class downloaderMgr():
         self.taskQ = Queue.Queue()
         self.down_processes =[]
 
-    def start_download(self):
+    def start_downloader(self):
         concur_num = int(self.config["CONCUR_NUM"])
-        task_pickle = self.config["QVODTASK_FILE"]
-        task_pickle = os.path.normpath(os.path.join(__HOME__, task_pickle))
+        dbname = self.config["QVODTASK_DB"]
+        dbname = os.path.normpath(os.path.join(__HOME__, dbname))
 
-        # start download threads at first time
-        if len(self.down_processes) == 0:
-            tasks = []
-            taskQ = None
-            with FileLock(task_pickle):
-                with file(task_pickle, "r+") as f:
-                    try:
-                        taskQ = cPickle.load(f)
-                        if len(taskQ):
-                            logger.info("taskQ: %s" % str(taskQ))
-                    except EOFError, e:
-                        logger.info ("there is no task to download.")
-
-                    for i in xrange(concur_num):
-                        qvod_url = ""
-                        try:
-                            qvod_url = taskQ.popleft()
-                        except IndexError, e :
-                            break
-                        tasks.append(qvod_url)
-
-                    s = cPickle.dumps(taskQ)
-                    f.seek(0,0)
-                    f.truncate()
-                    f.write(s)
-
-            for t in tasks:
-                self.down_processes.append(Process(target = qvod_download_proc, args = (self.config, t)))
-            for t in self.down_processes:
-                t.daemon = True
-                t.start()
-            time.sleep(5)
-            return 
-        
-        need_start = False
-        for t in self.down_processes:
-            if not t.is_alive():
-                self.down_processes.remove(t)
-        
-        if len(self.down_processes) < concur_num:
-            need_start = True
-        if need_start:
-            qvod_urls = []
-            with FileLock(task_pickle):
-                with file (task_pickle, "r+") as f:
-                    taskQ = cPickle.load(f)
-                    for i in xrange(concur_num - len(self.down_processes)):
-                        try:
-                            qvod_url = taskQ.popleft()
-                            qvod_urls.append(qvod_url)
-                        except IndexError, e:
-                            pass 
-                    s = cPickle.dumps(taskQ)
-                    f.seek(0,0)
-                    f.truncate()
-                    f.write(s)
-            for qvod_url in qvod_urls:
-                t = Process(target = qvod_download_proc, args = (self.config, qvod_url))
-                self.down_processes.append(t)
-                t.daemon = True
-                t.start()
-        
-        time.sleep(5)
+        select_tasks = "select id, qvod_url, hash_code from qvod_task where id > %d and status = 'initialized' "
+        while True:
+            for p in self.down_processes:
+                if not p.is_alive(): self.down_processes.remove(p)
+            if len(self.down_processes) != concur_num:
+                sql = select_tasks % self.cur_task_id
+                items = sqlite_query(dbname, sql)
+                time.sleep(0.1)
+                if len(items) > 0 :
+                    p = Process(target = qvod_download_proc, args = (self,))
+                    self.down_processes.append(p)
+                    p.daemon = True
+                    p.start()
+            time.sleep(10)
 
     def run(self):
         while True:
-            self.start_download()
+            self.start_downloader()
             
-def qvod_download_proc(config, qvod_url):
+def qvod_download_proc(instance):
     """
     get task from downloaderMgr, 
     start downloader.download_proc,
     update db
     """
+    config = instance.config
+    
     dbname = config["QVODTASK_DB"]
     cache_path = config["CACHE_PATH"]
     down_prex = config["DOWN_PREX"]
     cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
     dbname = os.path.normpath(os.path.join(__HOME__, dbname))
+
+    pid = os.getpid()
+    select_task = "select id, qvod_url from qvod_task where id > %d and status = 'initialized' order by id limit 1" 
+    update_task = "update qvod_task set status = 'processing', downloader_pid = %d where id = %d"
+    qvod_url = ""
+    curr_task_id = 0
+    with FileLock(dbname, timeout = 30):
+        cur_id = instance.cur_task_id
+        sql = select_task % cur_id
+        try:
+            conn = sqlite3.connect(dbname)
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            task = cursor.fetchall()
+            curr_task_id = task[0][0]
+            instance.cur_task_id = curr_task_id
+            qvod_url = task[0][1]
+            sql = update_task % (pid, instance.cur_task_id)
+            cursor.execute(sql)
+            conn.commit()
+            conn.close()
+        except Exception, err:
+            print str(traceback.format_exc())
 
     if qvod_url.__class__ is unicode:
         qvod_url = qvod_url.encode("utf-8")
@@ -140,12 +120,14 @@ def qvod_download_proc(config, qvod_url):
     filename = hash_code + suffix
     ret = downloader.download_proc(qvod_url, filename)
     
+    download_url = down_prex + filename
     sql = ""
-    if ret:
+    if not ret:
         sql = "update qvod_task set status = 'error' where hash_code = '%s' " % hash_code
     else:
-        sql = "update qvod_task set status = 'succed' where hash_code = '%s' " % hash_code
-    qvod_exec(dbname, sql)
+        sql = "update qvod_task set status = 'succeed', download_url = '%s', filename = '%s' where hash_code = '%s' " % (download_url, filename, hash_code)
+    sqlite_exec(dbname, sql)
+    return True
     
 
 if __name__ == '__main__':
