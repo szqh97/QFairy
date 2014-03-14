@@ -9,6 +9,7 @@ import os
 import sqlite3
 import sys
 import cPickle
+import signal
 import traceback
 import collections
 import simplejson
@@ -163,7 +164,7 @@ class killdownloader:
             hash_code = hash_code.encode('utf-8')
 
         # kill the downloader process and delete task from db, this task may retried
-        sql = "select downlaoder_pid from qvod_task where status = 'processing' and hash_code = '%s'" % hash_code
+        sql = "select downloader_pid from qvod_task where status = 'processing' and hash_code = '%s'" % hash_code
         with FileLock(dbname, timeout=30):
             try:
                 conn = sqlite3.connect(dbname)
@@ -217,15 +218,15 @@ class deletefile:
 
         exist_files = [ os.path.normpath(os.path.join(video_path,f)) for f in exist_files ]
         print exist_files
-        files2del = ' '.join(exist_files)
         
-        if not os.path.isfile(file2del):
-            print file2del, "is not file"
-            ErrorCode = -1
-            ErrorMessage = "server error: delete files error"
-        if os.remove(file2del) != 0:
-            ErrorCode = -1
-            ErrorMessage = "server error: delete files error"
+        for f in exist_files:
+            if not os.path.isfile(f):
+                print f, "is not file"
+                ErrorCode = -1
+                ErrorMessage = "server error: delete files error"
+            if os.remove(f) != 0:
+                ErrorCode = -1
+                ErrorMessage = "server error: delete files error"
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
         return simplejson.dumps(resp)
 
