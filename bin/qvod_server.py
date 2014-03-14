@@ -39,6 +39,11 @@ status_dict = { "succeed": 0,
         "input error": 100
         }
 
+def utf8(s):
+    if s.__class__ is unicode:
+        s = s.encode('utf-8')
+    return s
+
 def load_config():
     config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
     config = ConfigParser()
@@ -124,7 +129,7 @@ class task_query:
             hash_code = params["hash_code"]
         if len(hash_code) == 0:
             ErrorCode = 100
-            ErrorMesage = "input error"
+            ErrorMessage = "input error"
             resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
             return simplejson.dumps(resp)
         if hash_code.__class__ is unicode: 
@@ -157,7 +162,7 @@ class killdownloader:
             hash_code = params["hash_code"]
         if len(hash_code) == 0:
             ErrorCode = 100
-            ErrorMesage = "input error"
+            ErrorMessage = "input error"
             resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage, "DownloadURL" : DownloadURL}
             return simplejson.dumps(resp)
         if hash_code.__class__ is unicode: 
@@ -193,33 +198,43 @@ class deletefile:
         self.config = load_config()
 
     def POST(self):
+        raw_data = web.data()
+        req = simplejson.loads(raw_data)
+        try:
+            hash_list = req["hashid_list"]
+        except Exception, err:
+            ErrorCode = 100
+            ErrorMessage = "input error"
+            resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage}
+            return simplejson.dumps(resp)
         ErrorCode = 0
         ErrorMessage = "success"
         config = self.config
         video_path = config["VIDEO_PATH"]
-        cache_path = config["CACHE_PATH"]
+        dbname = config["QVODTASK_DB"]
         video_path = os.path.normpath(os.path.join(__HOME__, video_path))
-        cache_path = os.path.normpath(os.path.join(__HOME__, cache_path))
-        raw_data = web.data()
-        req = simplejson.loads(raw_data)
-        hash_list = req["hashid_list"]
-        files = os.listdir(video_path)
-        print files
-        exist_files = []
-        for hash_code in hash_list:
-            
-            exist_files += [ f for f in files if re.match(hash_code + ".*", f, re.IGNORECASE) and os.path.isfile(os.path.normpath(os.path.join(video_path, f)))]
-            print exist_files, 'xxx'
-        if len(exist_files) == 0:
+        dbname= os.path.normpath(os.path.join(__HOME__, dbname))
+
+        
+        res = []
+        hashlist = tuple( utf8(h) for h in hash_list )
+        sql = ""
+        if len(hashlist) >1:
+            sql = "select filename from qvod_task where hash_code in %s" % str(hashlist)
+        else:
+            sql = "select filename from qvod_task where hash_code = '%s'" % hashlist[0]
+        print sql
+        res = sqlite_query(dbname, sql)
+
+        if len(res) == 0:
             ErrorCode = 100
             ErrorMessage = "input error"
             resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
             return simplejson.dumps(resp)
 
-        exist_files = [ os.path.normpath(os.path.join(video_path,f)) for f in exist_files ]
-        print exist_files
-        
-        for f in exist_files:
+        for f in res:
+            f = utf8(f[0])
+            f = os.path.normpath(os.path.join(video_path, f))
             if not os.path.isfile(f):
                 print f, "is not file"
                 ErrorCode = -1
@@ -227,6 +242,7 @@ class deletefile:
             if os.remove(f) != 0:
                 ErrorCode = -1
                 ErrorMessage = "server error: delete files error"
+
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
         return simplejson.dumps(resp)
 
