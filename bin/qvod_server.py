@@ -186,12 +186,14 @@ class killdownloader:
                     os.kill(pid, signal.SIGTERM)
                 except OSError:
                     print str(traceback.format_exc())
+                    raise Exception("kill pid %d error" % pid)
                 sql = "delete from qvod_task where hash_code = '%s' " % hash_code
                 cursor.execute(sql)
                 conn.commit()
-                conn.close()
             except Exception, err:
                 print str(traceback.format_exc())
+            finally:
+                conn.close()
 
 class deletefile:
     def __init__(self):

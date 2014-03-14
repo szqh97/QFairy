@@ -16,26 +16,28 @@ def valid_db(dbname):
 def sqlite_query(dbname, sql):
     valid_db(dbname)
     items = None
-    try:
-        with FileLock(dbname, timeout = 30):
+    with FileLock(dbname, timeout = 30):
+        try:
             conn = sqlite3.connect(dbname)
             cursor = conn.cursor()
             cursor.execute(sql)
             items = cursor.fetchall()
+        except Exception, err:
+            print str(traceback.format_exc())
+        finally:
             conn.close()
-    except Exception, err:
-        print str(traceback.format_exc())
     return items
 
 def sqlite_exec(dbname, sql):
     valid_db(dbname)
-    try:
-        with FileLock(dbname, timeout = 30):
+    with FileLock(dbname, timeout = 30):
+        try:
             conn = sqlite3.connect(dbname)
             cursor = conn.cursor()
             cursor.execute(sql)
             conn.commit()
+        except Exception, err:
+            print str(traceback.format_exc())
+        finally:
             conn.close()
-    except Exception, err:
-        print str(traceback.format_exc())
 

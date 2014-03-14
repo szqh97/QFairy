@@ -99,9 +99,10 @@ def qvod_download_proc(instance):
             sql = update_task % (pid, instance.cur_task_id)
             cursor.execute(sql)
             conn.commit()
-            conn.close()
         except Exception, err:
             print str(traceback.format_exc())
+        finally:
+            conn.close()
 
     if qvod_url.__class__ is unicode:
         qvod_url = qvod_url.encode("utf-8")
