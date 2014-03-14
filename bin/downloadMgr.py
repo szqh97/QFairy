@@ -113,7 +113,9 @@ def qvod_download_proc(instance):
         movie_len, hash_code, movie = trunks
     else:
         logger.error("ivalid qvod url:%s", qvod_url)
-        return 
+        sql = "update qvod_task set status = 'error' where hash_code = '%s' " % hash_code
+        sqlite_exec(dbname, sql)
+        return False
 
     movie = movie.replace(' ', "\ ").replace('(', "\(").replace(')', "\)")
     suffix = '.'.join(('', movie.split('.')[-1]))
