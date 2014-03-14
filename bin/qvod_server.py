@@ -220,9 +220,9 @@ class deletefile:
         hashlist = tuple( utf8(h) for h in hash_list )
         sql = ""
         if len(hashlist) >1:
-            sql = "select filename from qvod_task where hash_code in %s" % str(hashlist)
+            sql = "select filename from qvod_task where hash_code in %s and status = 'succeed'" % str(hashlist)
         else:
-            sql = "select filename from qvod_task where hash_code = '%s'" % hashlist[0]
+            sql = "select filename from qvod_task where hash_code = '%s' and status = 'succeed'" % hashlist[0]
         print sql
         res = sqlite_query(dbname, sql)
 
@@ -239,7 +239,16 @@ class deletefile:
                 print f, "is not file"
                 ErrorCode = -1
                 ErrorMessage = "server error: delete files error"
-            if os.remove(f) != 0:
+                resp = {"ErrorCode" : ErrorCode, "ErrorMessage": ErrorMessage}
+                return simplejson.dumps(resp)
+
+        for f in res:
+            f = utf8(f[0])
+            f = os.path.normpath(os.path.join(video_path, f))
+            try:
+                os.remove(f)
+                print f
+            except OSError:
                 ErrorCode = -1
                 ErrorMessage = "server error: delete files error"
 
