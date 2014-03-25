@@ -11,6 +11,7 @@ import sys
 import cPickle
 import signal
 import traceback
+import time
 import collections
 import simplejson
 from filelock import FileLock
@@ -170,6 +171,7 @@ class killdownloader:
         params = web.input()
         ErrorCode = 0
         ErrorMessage = "success"
+        cache_dir = config["CACHE_PATH"]
 
         if params.has_key("hash_code"):
             hash_code = params["hash_code"]
@@ -182,6 +184,7 @@ class killdownloader:
 
         # kill the downloader process and delete task from db, this task may retried
         sql = "select downloader_pid from qvod_task where status = 'processing' and hash_code = '%s'" % hash_code
+        pid = -1
         with FileLock(dbname, timeout=30):
             try:
                 conn = sqlite3.connect(dbname)
@@ -194,13 +197,6 @@ class killdownloader:
                     resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage}
                     return simplejson.dumps(resp)
                 pid = int(item[0][0])
-                try:
-                    if os.name == 'nt':
-                        kill_child_processes(pid)
-                    os.kill(pid, signal.SIGTERM)
-                except OSError:
-                    print str(traceback.format_exc())
-                    raise Exception("kill pid %d error" % pid)
                 sql = "delete from qvod_task where hash_code = '%s' " % hash_code
                 cursor.execute(sql)
                 conn.commit()
@@ -208,6 +204,21 @@ class killdownloader:
                 print str(traceback.format_exc())
             finally:
                 conn.close()
+        try:
+            if os.name == 'nt':
+                kill_child_processes(pid)
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(0.1)
+
+        except OSError:
+            print str(traceback.format_exc())
+            raise Exception("kill pid %d error" % pid)
+        try:
+            cache_dir = os.path.normpath(os.path.join(cache_dir, hash_code))
+            shutil.rmtree(cache_dir)
+        except Exception, err:
+            print "rm cachedir:", cache_dir, "errr"
+
         resp = {"ErrorCode" : ErrorCode, "ErrorMessage" : ErrorMessage}
         return simplejson.dumps(resp)
 
