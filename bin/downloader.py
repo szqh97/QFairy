@@ -11,6 +11,8 @@ import sys
 import time
 import thread
 import logging
+import traceback
+import psutil
 import logging.config
 import subprocess
 from ConfigParser import ConfigParser
@@ -27,7 +29,30 @@ def signal_handler_for_terminate(signum, frame):
  
 def install_signal_handlers():
     signal.signal(signal.SIGTERM, signal_handler_for_terminate)
-
+    
+def kill_child_processes(parent_pid, sig=signal.SIGTERM):
+    try:
+      p = psutil.Process(parent_pid)
+    except psutil.error.NoSuchProcess:
+      return
+    child_pid = p.get_children(recursive=True)
+    for pid in child_pid:
+      os.kill(pid.pid, sig)
+def delete_file_folder(src):
+    '''delete files and folders'''
+    if os.path.isfile(src):
+        try:
+            os.remove(src)
+        except:
+            pass
+    elif os.path.isdir(src):
+        for item in os.listdir(src):
+            itemsrc=os.path.join(src,item)
+            delete_file_folder(itemsrc) 
+        try:
+            os.rmdir(src)
+        except:
+            pass      
 logger = logging
 def install_logger():
     global logger
@@ -165,6 +190,8 @@ def download_proc(qvod_url, frename = ""):
         cur_time = time.time()
         passed_time = cur_time - start_time
         if cur_time - last_update >= timeout:
+            if os.name == 'nt':
+                kill_child_processes(os.getpid())
             p_downloader.terminate()
             p_downloader.wait()
             logger.info("time out kill downloader")
@@ -178,12 +205,14 @@ def download_proc(qvod_url, frename = ""):
         # receive SIGTERM
         #FIXME update db
         try:
-            p_downloader.terminate()
-            p_downloader.wait()
-            shutil.rmtree(cache_dir)
+            if os.name == 'nt':
+                kill_child_processes(os.getpid())
+            
+            delete_file_folder(cache_dir)
             logger.info("process killed, %s ", hash_code)
         except Exception, err:
             logger.error("kill process %s error:%s", hash_code, err)
+            logger.error("%s", str(traceback.format_exc()))
 
     return False
 

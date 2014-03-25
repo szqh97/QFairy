@@ -54,6 +54,22 @@ def kill_child_processes(parent_pid, sig=signal.SIGTERM):
     child_pid = p.get_children(recursive=True)
     for pid in child_pid:
       os.kill(pid.pid, sig)
+     
+def delete_file_folder(src):
+    '''delete files and folders'''
+    if os.path.isfile(src):
+        try:
+            os.remove(src)
+        except:
+            pass
+    elif os.path.isdir(src):
+        for item in os.listdir(src):
+            itemsrc=os.path.join(src,item)
+            delete_file_folder(itemsrc) 
+        try:
+            os.rmdir(src)
+        except:
+            pass
 
 def load_config():
     config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
@@ -208,14 +224,16 @@ class killdownloader:
             if os.name == 'nt':
                 kill_child_processes(pid)
             os.kill(pid, signal.SIGTERM)
-            time.sleep(0.1)
+            time.sleep(1)
 
         except OSError:
             print str(traceback.format_exc())
             raise Exception("kill pid %d error" % pid)
         try:
+            cache_dir = os.path.normpath(os.path.join(__HOME__, cache_dir))
             cache_dir = os.path.normpath(os.path.join(cache_dir, hash_code))
-            shutil.rmtree(cache_dir)
+            print cache_dir
+            delete_file_folder(cache_dir)
         except Exception, err:
             print "rm cachedir:", cache_dir, "errr"
 
