@@ -16,6 +16,7 @@ import simplejson
 from filelock import FileLock
 from ConfigParser import ConfigParser
 from sqliteutils import sqlite_query, sqlite_exec
+import psutil
 
 #FIXME add path environment varibles if run it as moudule of apache
 #sys.path.append(os.path.normpath(os.path.join(sys.path[0], "")))
@@ -43,6 +44,15 @@ def utf8(s):
     if s.__class__ is unicode:
         s = s.encode('utf-8')
     return s
+
+def kill_child_processes(parent_pid, sig=signal.SIGTERM):
+    try:
+      p = psutil.Process(parent_pid)
+    except psutil.error.NoSuchProcess:
+      return
+    child_pid = p.get_children(recursive=True)
+    for pid in child_pid:
+      os.kill(pid.pid, sig)
 
 def load_config():
     config_file = os.path.normpath(os.path.join(__HOME__, "config", "Qconfig"))
@@ -185,6 +195,8 @@ class killdownloader:
                     return simplejson.dumps(resp)
                 pid = int(item[0][0])
                 try:
+                    if os.name == 'nt':
+                        kill_child_processes(pid)
                     os.kill(pid, signal.SIGTERM)
                 except OSError:
                     print str(traceback.format_exc())
