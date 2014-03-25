@@ -47,16 +47,16 @@ class downloaderMgr():
         dbname = self.config["QVODTASK_DB"]
         dbname = os.path.normpath(os.path.join(__HOME__, dbname))
 
-        select_tasks = "select id, qvod_url, hash_code from qvod_task where id > %d and status = 'initialized' "
+        select_tasks = "select id from qvod_task where status = 'initialized' order by id limit 1"
         while True:
             for p in self.down_processes:
                 if not p.is_alive(): self.down_processes.remove(p)
             if len(self.down_processes) != concur_num:
-                sql = select_tasks % self.cur_task_id
+                sql = select_tasks 
                 items = sqlite_query(dbname, sql)
                 time.sleep(0.1)
                 if len(items) > 0 :
-                    p = Process(target = qvod_download_proc, args = (self,))
+                    p = Process(target = qvod_download_proc, args = (self.config,))
                     self.down_processes.append(p)
                     p.daemon = True
                     p.start()
@@ -66,13 +66,12 @@ class downloaderMgr():
         while True:
             self.start_downloader()
             
-def qvod_download_proc(instance):
+def qvod_download_proc(config):
     """
     get task from downloaderMgr, 
     start downloader.download_proc,
     update db
     """
-    config = instance.config
     
     dbname = config["QVODTASK_DB"]
     cache_path = config["CACHE_PATH"]
@@ -81,22 +80,20 @@ def qvod_download_proc(instance):
     dbname = os.path.normpath(os.path.join(__HOME__, dbname))
 
     pid = os.getpid()
-    select_task = "select id, qvod_url from qvod_task where id > %d and status = 'initialized' order by id limit 1" 
+    select_task = "select id, qvod_url from qvod_task where  status = 'initialized' order by id limit 1" 
     update_task = "update qvod_task set status = 'processing', downloader_pid = %d where id = %d"
     qvod_url = ""
     curr_task_id = 0
     with FileLock(dbname, timeout = 30):
-        cur_id = instance.cur_task_id
-        sql = select_task % cur_id
+        sql = select_task 
         try:
             conn = sqlite3.connect(dbname)
             cursor = conn.cursor()
             cursor.execute(sql)
             task = cursor.fetchall()
-            curr_task_id = task[0][0]
-            instance.cur_task_id = curr_task_id
+            cur_task_id = task[0][0]
             qvod_url = task[0][1]
-            sql = update_task % (pid, instance.cur_task_id)
+            sql = update_task % (pid, cur_task_id)
             cursor.execute(sql)
             conn.commit()
         except Exception, err:
