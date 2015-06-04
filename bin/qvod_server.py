@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Author: li_yun@vobile.cn
+# Author: li_yun@163.com
 # Date: 2014-02-20 16:04:14
 
 import web
